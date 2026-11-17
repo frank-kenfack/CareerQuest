@@ -4,6 +4,7 @@ interface HealthStatusPayload {
   status: string;
   service: string;
   database: string;
+  database_engine?: string;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -38,6 +39,13 @@ export default function App() {
     };
   }, []);
 
+  const formatHealthBadge = (healthPayload: HealthStatusPayload) => {
+    if (healthPayload.database_engine) {
+      return `API active (${healthPayload.database} : ${healthPayload.database_engine})`;
+    }
+    return `API active (${healthPayload.database})`;
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800 bg-slate-900/80 px-6 py-4">
@@ -52,10 +60,10 @@ export default function App() {
           </div>
           <div
             data-testid="backend-status"
-            className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs"
+            className="rounded-full border border-emerald-500/40 bg-emerald-950/50 px-3 py-1 text-xs text-emerald-300"
           >
             {backendHealth
-              ? `API active (${backendHealth.database})`
+              ? formatHealthBadge(backendHealth)
               : connectionFailed
                 ? "API hors ligne"
                 : "Vérification de l'API..."}
@@ -71,6 +79,24 @@ export default function App() {
           <p className="mt-2 text-sm text-slate-300">
             Accomplissez des quêtes, validez des compétences techniques et faites évoluer votre avatar.
           </p>
+          {backendHealth && (
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                <p className="text-xs text-slate-400">Conteneur Frontend</p>
+                <p className="mt-1 text-sm font-medium text-indigo-300">React + Nginx (port 3000)</p>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                <p className="text-xs text-slate-400">Conteneur Backend</p>
+                <p className="mt-1 text-sm font-medium text-indigo-300">{backendHealth.service} ({backendHealth.status})</p>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                <p className="text-xs text-slate-400">Conteneur Base de données</p>
+                <p className="mt-1 text-sm font-medium text-emerald-300">
+                  {backendHealth.database_engine || "PostgreSQL"} ({backendHealth.database})
+                </p>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>

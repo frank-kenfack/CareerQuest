@@ -11,3 +11,4 @@ class HealthCheckEndpointTest(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["service"], "careerquest-backend")
         self.assertEqual(payload["database"], "connected")
+        self.assertIn(payload["database_engine"], ("sqlite", "postgresql"))
