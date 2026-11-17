@@ -1,0 +1,42 @@
+# Environnements et secrets
+.env
+.env.*
+!.env.example
+
+# Python et Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+db.sqlite3
+media/
+staticfiles/
+
+# Node et React
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker et volumes locaux
+postgres_data/
+
+# Editeurs et systeme
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
