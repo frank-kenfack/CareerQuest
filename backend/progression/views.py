@@ -7,14 +7,16 @@ from rest_framework.response import Response
 
 @api_view(["GET"])
 def health_check(request):
+    default_connection = connections["default"]
     try:
-        connections["default"].cursor()
+        default_connection.cursor()
     except OperationalError:
         return Response(
             {
                 "status": "degraded",
                 "service": "careerquest-backend",
                 "database": "unreachable",
+                "database_engine": default_connection.vendor,
             },
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
@@ -24,6 +26,7 @@ def health_check(request):
             "status": "ok",
             "service": "careerquest-backend",
             "database": "connected",
+            "database_engine": default_connection.vendor,
         },
         status=status.HTTP_200_OK,
     )
