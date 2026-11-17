@@ -73,14 +73,21 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-6 py-10">
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-lg font-semibold text-white">
-            Tableau de bord du joueur
-          </h2>
-          <p className="mt-2 text-sm text-slate-300">
-            Accomplissez des quêtes, validez des compétences techniques et faites évoluer votre avatar.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Tableau de bord du joueur
+              </h2>
+              <p className="mt-1 text-sm text-slate-300">
+                Accomplissez des quêtes, validez des compétences techniques et faites évoluer votre avatar.
+              </p>
+            </div>
+            <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
+              Socle Jour 1 validé (3 conteneurs + CI/CD)
+            </span>
+          </div>
           {backendHealth && (
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
                 <p className="text-xs text-slate-400">Conteneur Frontend</p>
                 <p className="mt-1 text-sm font-medium text-indigo-300">React + Nginx (port 3000)</p>
@@ -93,6 +100,12 @@ export default function App() {
                 <p className="text-xs text-slate-400">Conteneur Base de données</p>
                 <p className="mt-1 text-sm font-medium text-emerald-300">
                   {backendHealth.database_engine || "PostgreSQL"} ({backendHealth.database})
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                <p className="text-xs text-slate-400">Pipeline CI/CD</p>
+                <p className="mt-1 text-sm font-medium text-emerald-300">
+                  GitLab CI & GitHub Actions (4 étapes)
                 </p>
               </div>
             </div>
