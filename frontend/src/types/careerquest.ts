@@ -1,5 +1,7 @@
 export type AvatarVisualTier = "novice" | "apprenti" | "confirme" | "maitre";
 
+export type SkillCategory = "frontend" | "backend" | "devops" | "cloud";
+
 export interface SchoolInfo {
   id: number;
   name: string;
@@ -37,6 +39,21 @@ export interface AvatarTierDefinition {
 export interface ProgressionTiersPayload {
   xp_per_level: number;
   tiers: AvatarTierDefinition[];
+}
+
+export interface SkillNodeItem {
+  id: number;
+  code: string;
+  name: string;
+  category: SkillCategory;
+  description: string;
+  xp_reward: number;
+  required_level: number;
+  parent_skill_id: number | null;
+  parent_skill_code: string | null;
+  parent_skill_name: string | null;
+  is_unlocked: boolean;
+  is_available: boolean;
 }
 
 export interface HealthStatusPayload {
