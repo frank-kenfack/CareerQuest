@@ -8,12 +8,25 @@ import {
   StudentProfile,
 } from "./types/careerquest";
 
+interface SkillNodePreview {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  xp_reward: number;
+  required_level: number;
+  parent_skill_name: string | null;
+  is_unlocked: boolean;
+  is_available: boolean;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const ACCESS_TOKEN_STORAGE_KEY = "careerquest_access_token";
 
 export default function App() {
   const [backendHealth, setBackendHealth] = useState<HealthStatusPayload | null>(null);
   const [progressionLadder, setProgressionLadder] = useState<ProgressionTiersPayload | null>(null);
+  const [skillNodesPreview, setSkillNodesPreview] = useState<SkillNodePreview[]>([]);
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
@@ -59,10 +72,28 @@ export default function App() {
         // Les paliers sont optionnels lors des tests unitaires isoles du composant d'en-tete.
       });
 
+    fetch(`${API_BASE_URL}/skills/`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json() as Promise<SkillNodePreview[]>;
+      })
+      .then((skillsPayload) => {
+        if (isMounted && Array.isArray(skillsPayload)) {
+          setSkillNodesPreview(skillsPayload);
+        }
+      })
+      .catch(() => {
+        // Le catalogue de competences est optionnel lors des tests unitaires isoles.
+      });
+
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken || currentStudent) {
@@ -213,7 +244,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 2.3 active (Interface Auth JWT & Avatar Évolutif)
+              Étape 2.4 active (API Arbre de Compétences & Prérequis)
             </span>
           </div>
         </section>
@@ -230,6 +261,46 @@ export default function App() {
             apiBaseUrl={API_BASE_URL}
             onAuthenticated={handleAuthenticated}
           />
+        )}
+
+        {skillNodesPreview.length > 0 && (
+          <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  Catalogue Backend de l'Arbre de Compétences ({skillNodesPreview.length} noeuds actifs)
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Servi par /api/skills/ et /api/skills/{"{id}"}/unlock/ avec vérification des compétences parentes
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {skillNodesPreview.map((skillItem) => (
+                <div
+                  key={skillItem.code}
+                  className="rounded-lg border border-slate-800 bg-slate-950 p-3.5"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="rounded bg-slate-800 px-2 py-0.5 font-semibold uppercase text-indigo-300">
+                      {skillItem.category}
+                    </span>
+                    <span className="font-semibold text-emerald-400">
+                      +{skillItem.xp_reward} XP
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {skillItem.name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {skillItem.parent_skill_name
+                      ? `Prérequis : ${skillItem.parent_skill_name}`
+                      : "Compétence racine (Niveau 1)"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {progressionLadder && (

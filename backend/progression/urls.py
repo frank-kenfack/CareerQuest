@@ -6,7 +6,9 @@ from progression.views import (
     health_check,
     list_avatar_progression_tiers,
     list_schools,
+    list_skill_tree,
     register_student,
+    unlock_skill_node,
 )
 
 urlpatterns = [
@@ -18,4 +20,6 @@ urlpatterns = [
     path("schools/", list_schools, name="school-list"),
     path("avatar/progression-tiers/", list_avatar_progression_tiers, name="avatar-progression-tiers"),
     path("avatar/award-xp/", award_avatar_experience, name="avatar-award-xp"),
+    path("skills/", list_skill_tree, name="skill-tree-list"),
+    path("skills/<int:skill_id>/unlock/", unlock_skill_node, name="skill-node-unlock"),
 ]
