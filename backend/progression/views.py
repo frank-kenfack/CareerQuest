@@ -1,11 +1,20 @@
 from django.db import connections
 from django.db.utils import OperationalError
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from progression.models import Avatar, School, StudentProfile
+from progression.serializers import (
+    SchoolSerializer,
+    StudentProfileSerializer,
+    StudentRegistrationSerializer,
+)
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def health_check(request):
     default_connection = connections["default"]
     try:
@@ -27,6 +36,51 @@ def health_check(request):
             "service": "careerquest-backend",
             "database": "connected",
             "database_engine": default_connection.vendor,
+            "registered_students_count": StudentProfile.objects.count(),
         },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register_student(request):
+    registration_serializer = StudentRegistrationSerializer(data=request.data)
+    registration_serializer.is_valid(raise_exception=True)
+    student_profile = registration_serializer.save()
+
+    refresh_token = RefreshToken.for_user(student_profile.user)
+    profile_payload = StudentProfileSerializer(student_profile).data
+
+    return Response(
+        {
+            "student": profile_payload,
+            "tokens": {
+                "refresh": str(refresh_token),
+                "access": str(refresh_token.access_token),
+            },
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def current_student_profile(request):
+    student_profile, was_created = StudentProfile.objects.get_or_create(user=request.user)
+    if was_created:
+        Avatar.objects.get_or_create(student=student_profile)
+    return Response(
+        StudentProfileSerializer(student_profile).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def list_schools(request):
+    schools = School.objects.all()
+    return Response(
+        SchoolSerializer(schools, many=True).data,
         status=status.HTTP_200_OK,
     )
