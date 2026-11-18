@@ -11,9 +11,20 @@ class SchoolSerializer(serializers.ModelSerializer):
 
 
 class AvatarSerializer(serializers.ModelSerializer):
+    xp_for_next_level = serializers.IntegerField(read_only=True)
+    current_level_progress_percent = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Avatar
-        fields = ["level", "experience_points", "title", "visual_tier", "updated_at"]
+        fields = [
+            "level",
+            "experience_points",
+            "xp_for_next_level",
+            "current_level_progress_percent",
+            "title",
+            "visual_tier",
+            "updated_at",
+        ]
 
 
 class StudentProfileSerializer(serializers.ModelSerializer):
@@ -88,3 +99,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
         )
 
         return student_profile
+
+
+class AwardExperienceSerializer(serializers.Serializer):
+    earned_xp = serializers.IntegerField(min_value=1, max_value=5000)

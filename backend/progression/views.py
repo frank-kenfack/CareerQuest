@@ -5,8 +5,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from progression.models import Avatar, School, StudentProfile
+from progression.models import (
+    AVATAR_PROGRESSION_TIERS,
+    Avatar,
+    School,
+    StudentProfile,
+)
 from progression.serializers import (
+    AvatarSerializer,
+    AwardExperienceSerializer,
     SchoolSerializer,
     StudentProfileSerializer,
     StudentRegistrationSerializer,
@@ -82,5 +89,39 @@ def list_schools(request):
     schools = School.objects.all()
     return Response(
         SchoolSerializer(schools, many=True).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def list_avatar_progression_tiers(request):
+    return Response(
+        {
+            "xp_per_level": Avatar.XP_PER_LEVEL,
+            "tiers": AVATAR_PROGRESSION_TIERS,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def award_avatar_experience(request):
+    award_serializer = AwardExperienceSerializer(data=request.data)
+    award_serializer.is_valid(raise_exception=True)
+
+    student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    student_avatar, _ = Avatar.objects.get_or_create(student=student_profile)
+
+    progression_summary = student_avatar.award_experience(
+        award_serializer.validated_data["earned_xp"]
+    )
+
+    return Response(
+        {
+            "progression": progression_summary,
+            "avatar": AvatarSerializer(student_avatar).data,
+        },
         status=status.HTTP_200_OK,
     )

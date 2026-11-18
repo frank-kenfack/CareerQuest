@@ -3,6 +3,34 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 
+AVATAR_PROGRESSION_TIERS = [
+    {
+        "min_level": 1,
+        "min_xp": 0,
+        "visual_tier": "novice",
+        "title": "Novice",
+    },
+    {
+        "min_level": 3,
+        "min_xp": 200,
+        "visual_tier": "apprenti",
+        "title": "Apprenti DevOps",
+    },
+    {
+        "min_level": 5,
+        "min_xp": 400,
+        "visual_tier": "confirme",
+        "title": "Ingenieur Cloud Confirme",
+    },
+    {
+        "min_level": 8,
+        "min_xp": 700,
+        "visual_tier": "maitre",
+        "title": "Maitre Architecte Fullstack",
+    },
+]
+
+
 class School(models.Model):
     name = models.CharField(max_length=150, unique=True)
     city = models.CharField(max_length=100)
@@ -41,6 +69,8 @@ class StudentProfile(models.Model):
 
 
 class Avatar(models.Model):
+    XP_PER_LEVEL = 100
+
     VISUAL_TIER_CHOICES = [
         ("novice", "Novice"),
         ("apprenti", "Apprenti"),
@@ -74,3 +104,50 @@ class Avatar(models.Model):
 
     def __str__(self):
         return f"{self.student.user.username} - Niveau {self.level} ({self.title})"
+
+    @property
+    def xp_for_next_level(self):
+        return self.level * self.XP_PER_LEVEL
+
+    @property
+    def current_level_progress_percent(self):
+        return self.experience_points % self.XP_PER_LEVEL
+
+    @classmethod
+    def resolve_tier_for_level(cls, target_level):
+        selected_tier = AVATAR_PROGRESSION_TIERS[0]
+        for tier_definition in AVATAR_PROGRESSION_TIERS:
+            if target_level >= tier_definition["min_level"]:
+                selected_tier = tier_definition
+        return selected_tier
+
+    def recalculate_progression(self):
+        computed_level = 1 + (self.experience_points // self.XP_PER_LEVEL)
+        matched_tier = self.resolve_tier_for_level(computed_level)
+        self.level = computed_level
+        self.visual_tier = matched_tier["visual_tier"]
+        self.title = matched_tier["title"]
+
+    def award_experience(self, earned_xp):
+        if earned_xp <= 0:
+            raise ValueError("Les points d'experience attribues doivent etre strictement positifs.")
+
+        previous_level = self.level
+        previous_tier = self.visual_tier
+
+        self.experience_points += earned_xp
+        self.recalculate_progression()
+        self.save()
+
+        return {
+            "previous_level": previous_level,
+            "new_level": self.level,
+            "leveled_up": self.level > previous_level,
+            "previous_tier": previous_tier,
+            "visual_tier": self.visual_tier,
+            "tier_evolved": self.visual_tier != previous_tier,
+            "title": self.title,
+            "experience_points": self.experience_points,
+            "xp_for_next_level": self.xp_for_next_level,
+            "current_level_progress_percent": self.current_level_progress_percent,
+        }
