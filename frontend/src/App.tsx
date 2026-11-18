@@ -8,10 +8,23 @@ interface HealthStatusPayload {
   registered_students_count?: number;
 }
 
+interface AvatarTierDefinition {
+  min_level: number;
+  min_xp: number;
+  visual_tier: string;
+  title: string;
+}
+
+interface ProgressionTiersPayload {
+  xp_per_level: number;
+  tiers: AvatarTierDefinition[];
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 export default function App() {
   const [backendHealth, setBackendHealth] = useState<HealthStatusPayload | null>(null);
+  const [progressionLadder, setProgressionLadder] = useState<ProgressionTiersPayload | null>(null);
   const [connectionFailed, setConnectionFailed] = useState(false);
 
   useEffect(() => {
@@ -33,6 +46,22 @@ export default function App() {
         if (isMounted) {
           setConnectionFailed(true);
         }
+      });
+
+    fetch(`${API_BASE_URL}/avatar/progression-tiers/`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json() as Promise<ProgressionTiersPayload>;
+      })
+      .then((tiersPayload) => {
+        if (isMounted) {
+          setProgressionLadder(tiersPayload);
+        }
+      })
+      .catch(() => {
+        // Les paliers sont optionnels lors des tests unitaires isoles du composant d'en-tete.
       });
 
     return () => {
@@ -84,7 +113,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 2.1 active (Authentification JWT & Profil Avatar)
+              Étape 2.2 active (Moteur d'évolution Avatar RPG)
             </span>
           </div>
           {backendHealth && (
@@ -112,6 +141,44 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {progressionLadder && (
+          <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  Paliers d'évolution de l'Avatar ({progressionLadder.xp_per_level} XP par niveau)
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Calculés par le moteur Backend (/api/avatar/progression-tiers/ et /api/avatar/award-xp/)
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {progressionLadder.tiers.map((tierItem) => (
+                <div
+                  key={tierItem.visual_tier}
+                  className="rounded-lg border border-indigo-500/30 bg-slate-950 p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="rounded bg-indigo-950 px-2 py-0.5 text-xs font-semibold uppercase text-indigo-300">
+                      {tierItem.visual_tier}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Niveau {tierItem.min_level}+
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-white">
+                    {tierItem.title}
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-400">
+                    À partir de {tierItem.min_xp} XP
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
