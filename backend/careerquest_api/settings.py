@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
-    "careerquest-local-development-key",
+    "careerquest-local-development-secret-key-2026",
 )
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
