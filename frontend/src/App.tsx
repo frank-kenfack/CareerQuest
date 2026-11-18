@@ -5,6 +5,7 @@ interface HealthStatusPayload {
   service: string;
   database: string;
   database_engine?: string;
+  registered_students_count?: number;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -71,7 +72,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10 space-y-6">
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -83,7 +84,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Socle Jour 1 validé (3 conteneurs + CI/CD)
+              Étape 2.1 active (Authentification JWT & Profil Avatar)
             </span>
           </div>
           {backendHealth && (
@@ -97,15 +98,15 @@ export default function App() {
                 <p className="mt-1 text-sm font-medium text-indigo-300">{backendHealth.service} ({backendHealth.status})</p>
               </div>
               <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-                <p className="text-xs text-slate-400">Conteneur Base de données</p>
+                <p className="text-xs text-slate-400">Base PostgreSQL 16</p>
                 <p className="mt-1 text-sm font-medium text-emerald-300">
-                  {backendHealth.database_engine || "PostgreSQL"} ({backendHealth.database})
+                  Tables School, StudentProfile, Avatar ({backendHealth.database})
                 </p>
               </div>
               <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-                <p className="text-xs text-slate-400">Pipeline CI/CD</p>
+                <p className="text-xs text-slate-400">Authentification JWT</p>
                 <p className="mt-1 text-sm font-medium text-emerald-300">
-                  GitLab CI & GitHub Actions (4 étapes)
+                  /api/auth/register, login, refresh, me
                 </p>
               </div>
             </div>
