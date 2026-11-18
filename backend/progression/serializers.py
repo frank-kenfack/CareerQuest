@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
-from progression.models import Avatar, School, StudentProfile
+from progression.models import Avatar, School, SkillNode, StudentProfile
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -103,3 +103,46 @@ class StudentRegistrationSerializer(serializers.Serializer):
 
 class AwardExperienceSerializer(serializers.Serializer):
     earned_xp = serializers.IntegerField(min_value=1, max_value=5000)
+
+
+class SkillNodeSerializer(serializers.ModelSerializer):
+    parent_skill_id = serializers.IntegerField(source="parent_skill.id", read_only=True, allow_null=True)
+    parent_skill_code = serializers.CharField(source="parent_skill.code", read_only=True, allow_null=True)
+    parent_skill_name = serializers.CharField(source="parent_skill.name", read_only=True, allow_null=True)
+    is_unlocked = serializers.SerializerMethodField()
+    is_available = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SkillNode
+        fields = [
+            "id",
+            "code",
+            "name",
+            "category",
+            "description",
+            "xp_reward",
+            "required_level",
+            "parent_skill_id",
+            "parent_skill_code",
+            "parent_skill_name",
+            "is_unlocked",
+            "is_available",
+        ]
+
+    def get_is_unlocked(self, skill_node):
+        unlocked_ids = self.context.get("unlocked_skill_ids", set())
+        return skill_node.id in unlocked_ids
+
+    def get_is_available(self, skill_node):
+        unlocked_ids = self.context.get("unlocked_skill_ids", set())
+        if skill_node.id in unlocked_ids:
+            return False
+
+        student_level = self.context.get("student_level", 1)
+        if student_level < skill_node.required_level:
+            return False
+
+        if skill_node.parent_skill_id is None:
+            return True
+
+        return skill_node.parent_skill_id in unlocked_ids

@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from progression.models import Avatar, StudentProfile
+from progression.models import Avatar, SkillNode, StudentProfile, ensure_default_skill_tree
 
 
 class HealthCheckEndpointTest(TestCase):
@@ -99,7 +99,6 @@ class AvatarProgressionEngineTest(TestCase):
         self.avatar = Avatar.objects.create(student=self.student_profile)
 
     def test_avatar_evolves_across_all_four_visual_tiers_as_xp_increases(self):
-        # 150 XP -> Niveau 2 (reste au palier novice)
         first_step = self.avatar.award_experience(150)
         self.assertEqual(first_step["new_level"], 2)
         self.assertTrue(first_step["leveled_up"])
@@ -108,21 +107,18 @@ class AvatarProgressionEngineTest(TestCase):
         self.assertEqual(self.avatar.current_level_progress_percent, 50)
         self.assertEqual(self.avatar.xp_for_next_level, 200)
 
-        # +100 XP (total 250 XP) -> Niveau 3 (evolue vers apprenti)
         second_step = self.avatar.award_experience(100)
         self.assertEqual(second_step["new_level"], 3)
         self.assertTrue(second_step["tier_evolved"])
         self.assertEqual(self.avatar.visual_tier, "apprenti")
         self.assertEqual(self.avatar.title, "Apprenti DevOps")
 
-        # +200 XP (total 450 XP) -> Niveau 5 (evolue vers confirme)
         third_step = self.avatar.award_experience(200)
         self.assertEqual(third_step["new_level"], 5)
         self.assertTrue(third_step["tier_evolved"])
         self.assertEqual(self.avatar.visual_tier, "confirme")
         self.assertEqual(self.avatar.title, "Ingenieur Cloud Confirme")
 
-        # +300 XP (total 750 XP) -> Niveau 8 (evolue vers maitre)
         fourth_step = self.avatar.award_experience(300)
         self.assertEqual(fourth_step["new_level"], 8)
         self.assertTrue(fourth_step["tier_evolved"])
@@ -161,3 +157,75 @@ class AvatarProgressionEngineTest(TestCase):
         self.assertTrue(award_body["progression"]["leveled_up"])
         self.assertEqual(award_body["avatar"]["visual_tier"], "apprenti")
         self.assertEqual(award_body["avatar"]["title"], "Apprenti DevOps")
+
+
+class SkillTreeEndpointsTest(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        ensure_default_skill_tree()
+        register_response = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "clara_skills",
+                "email": "clara@careerquest.fr",
+                "password": "StrongPassword2026!",
+                "school_name": "Epitech Digital",
+            },
+            format="json",
+        )
+        self.access_token = register_response.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+    def test_list_skills_returns_default_tree_with_availability_states(self):
+        response = self.api_client.get(reverse("skill-tree-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        skill_nodes = response.json()
+        self.assertEqual(len(skill_nodes), 8)
+
+        docker_node = next(node for node in skill_nodes if node["code"] == "docker-containers")
+        cicd_node = next(node for node in skill_nodes if node["code"] == "gitlab-cicd")
+
+        self.assertFalse(docker_node["is_unlocked"])
+        self.assertTrue(docker_node["is_available"])
+        self.assertFalse(cicd_node["is_unlocked"])
+        self.assertFalse(cicd_node["is_available"])
+
+    def test_unlock_root_skill_awards_xp_and_unlocks_child_availability(self):
+        docker_skill = SkillNode.objects.get(code="docker-containers")
+        unlock_response = self.api_client.post(
+            reverse("skill-node-unlock", kwargs={"skill_id": docker_skill.id}),
+            format="json",
+        )
+        self.assertEqual(unlock_response.status_code, status.HTTP_200_OK)
+        unlock_payload = unlock_response.json()
+        self.assertTrue(unlock_payload["unlocked_skill"]["is_unlocked"])
+        self.assertEqual(unlock_payload["avatar"]["level"], 2)
+        self.assertEqual(unlock_payload["avatar"]["experience_points"], 100)
+
+        tree_response = self.api_client.get(reverse("skill-tree-list"))
+        cicd_node = next(node for node in tree_response.json() if node["code"] == "gitlab-cicd")
+        self.assertTrue(cicd_node["is_available"])
+
+    def test_unlock_child_skill_fails_when_parent_skill_is_locked(self):
+        cicd_skill = SkillNode.objects.get(code="gitlab-cicd")
+        response = self.api_client.post(
+            reverse("skill-node-unlock", kwargs={"skill_id": cicd_skill.id}),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("doit etre debloquee au prealable", response.json()["detail"])
+
+    def test_unlock_same_skill_twice_is_rejected(self):
+        docker_skill = SkillNode.objects.get(code="docker-containers")
+        first_response = self.api_client.post(
+            reverse("skill-node-unlock", kwargs={"skill_id": docker_skill.id}),
+            format="json",
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+
+        second_response = self.api_client.post(
+            reverse("skill-node-unlock", kwargs={"skill_id": docker_skill.id}),
+            format="json",
+        )
+        self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("deja debloquee", second_response.json()["detail"])

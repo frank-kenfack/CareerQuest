@@ -30,6 +30,81 @@ AVATAR_PROGRESSION_TIERS = [
     },
 ]
 
+DEFAULT_SKILL_TREE_NODES = [
+    {
+        "code": "react-components",
+        "name": "Composants React & TypeScript",
+        "category": "frontend",
+        "description": "Concevoir des interfaces modulaires typees avec gestion d'etat et hooks.",
+        "xp_reward": 100,
+        "required_level": 1,
+        "parent_code": None,
+    },
+    {
+        "code": "react-architecture",
+        "name": "Architecture SPA & Tests Vitest",
+        "category": "frontend",
+        "description": "Industrialiser les tests composants, le routage et l'optimisation de build Vite.",
+        "xp_reward": 150,
+        "required_level": 2,
+        "parent_code": "react-components",
+    },
+    {
+        "code": "django-rest-api",
+        "name": "API REST Django & Modelisation SQL",
+        "category": "backend",
+        "description": "Structurer des points de terminaison RESTful connectes a PostgreSQL.",
+        "xp_reward": 100,
+        "required_level": 1,
+        "parent_code": None,
+    },
+    {
+        "code": "jwt-security",
+        "name": "Securite JWT & Transactions PostgreSQL",
+        "category": "backend",
+        "description": "Proteger les ressources par jetons signes et garantir l'atomicite des ecritures.",
+        "xp_reward": 150,
+        "required_level": 2,
+        "parent_code": "django-rest-api",
+    },
+    {
+        "code": "docker-containers",
+        "name": "Conteneurisation Docker Multi-Services",
+        "category": "devops",
+        "description": "Isoler les services applicatifs avec des images multi-etapes et des healthchecks.",
+        "xp_reward": 100,
+        "required_level": 1,
+        "parent_code": None,
+    },
+    {
+        "code": "gitlab-cicd",
+        "name": "Pipelines GitLab CI & GitHub Actions",
+        "category": "devops",
+        "description": "Automatiser la validation, les tests unitaires et la construction des images.",
+        "xp_reward": 150,
+        "required_level": 2,
+        "parent_code": "docker-containers",
+    },
+    {
+        "code": "cloud-networking",
+        "name": "Reseaux Cloud, Nginx & Reverse Proxy",
+        "category": "cloud",
+        "description": "Configurer le routage HTTP, la repartition de charge et l'exposition des services.",
+        "xp_reward": 100,
+        "required_level": 1,
+        "parent_code": None,
+    },
+    {
+        "code": "kubernetes-cluster",
+        "name": "Orchestration Kubernetes, Ingress & PVC",
+        "category": "cloud",
+        "description": "Deployer des charges de travail resilientes avec stockage persistant sur cluster.",
+        "xp_reward": 200,
+        "required_level": 3,
+        "parent_code": "cloud-networking",
+    },
+]
+
 
 class School(models.Model):
     name = models.CharField(max_length=150, unique=True)
@@ -151,3 +226,81 @@ class Avatar(models.Model):
             "xp_for_next_level": self.xp_for_next_level,
             "current_level_progress_percent": self.current_level_progress_percent,
         }
+
+
+class SkillNode(models.Model):
+    CATEGORY_CHOICES = [
+        ("frontend", "Frontend"),
+        ("backend", "Backend"),
+        ("devops", "DevOps"),
+        ("cloud", "Cloud"),
+    ]
+
+    code = models.CharField(max_length=60, unique=True)
+    name = models.CharField(max_length=120)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    description = models.TextField()
+    xp_reward = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    required_level = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+    parent_skill = models.ForeignKey(
+        "self",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="child_skills",
+    )
+
+    class Meta:
+        db_table = "skill_node"
+        ordering = ["category", "required_level", "id"]
+
+    def __str__(self):
+        return f"{self.name} ({self.category})"
+
+
+class UnlockedSkill(models.Model):
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="unlocked_skills",
+    )
+    skill = models.ForeignKey(
+        SkillNode,
+        on_delete=models.CASCADE,
+        related_name="unlock_records",
+    )
+    unlocked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "unlocked_skill"
+        unique_together = [("student", "skill")]
+        ordering = ["unlocked_at"]
+
+    def __str__(self):
+        return f"{self.student.user.username} -> {self.skill.code}"
+
+
+def ensure_default_skill_tree():
+    created_nodes_by_code = {}
+    for node_spec in DEFAULT_SKILL_TREE_NODES:
+        parent_instance = None
+        if node_spec["parent_code"]:
+            parent_instance = created_nodes_by_code.get(node_spec["parent_code"]) or SkillNode.objects.filter(
+                code=node_spec["parent_code"]
+            ).first()
+
+        skill_node, _ = SkillNode.objects.update_or_create(
+            code=node_spec["code"],
+            defaults={
+                "name": node_spec["name"],
+                "category": node_spec["category"],
+                "description": node_spec["description"],
+                "xp_reward": node_spec["xp_reward"],
+                "required_level": node_spec["required_level"],
+                "parent_skill": parent_instance,
+            },
+        )
+        created_nodes_by_code[node_spec["code"]] = skill_node
