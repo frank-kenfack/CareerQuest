@@ -9,16 +9,33 @@ describe("App component", () => {
     vi.restoreAllMocks();
   });
 
-  it("displays the CareerQuest header and connected backend status", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        status: "ok",
-        service: "careerquest-backend",
-        database: "connected",
-      }),
-    } as Response);
+  it("displays the CareerQuest header, connected backend status and avatar tiers", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = String(input);
+      if (requestUrl.includes("/avatar/progression-tiers/")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            xp_per_level: 100,
+            tiers: [
+              { min_level: 1, min_xp: 0, visual_tier: "novice", title: "Novice" },
+              { min_level: 3, min_xp: 200, visual_tier: "apprenti", title: "Apprenti DevOps" },
+            ],
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: "ok",
+          service: "careerquest-backend",
+          database: "connected",
+        }),
+      } as Response;
+    });
 
     render(
       <MemoryRouter>
@@ -32,6 +49,7 @@ describe("App component", () => {
       expect(screen.getByTestId("backend-status")).toHaveTextContent(
         "API active (connected)"
       );
+      expect(screen.getByText("Apprenti DevOps")).toBeInTheDocument();
     });
   });
 });

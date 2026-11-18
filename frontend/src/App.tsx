@@ -56,7 +56,7 @@ export default function App() {
         return response.json() as Promise<ProgressionTiersPayload>;
       })
       .then((tiersPayload) => {
-        if (isMounted) {
+        if (isMounted && Array.isArray(tiersPayload.tiers)) {
           setProgressionLadder(tiersPayload);
         }
       })
