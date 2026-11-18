@@ -283,7 +283,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 2.5 active (Arbre de Compétences Interactif RPG)
+              Jour 2 validé (Auth JWT, Avatar Évolutif, Arbre de Compétences & CI : 21 tests)
             </span>
           </div>
         </section>
