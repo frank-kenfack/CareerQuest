@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import AvatarCard from "./components/AvatarCard";
 import GithubSyncPanel from "./components/GithubSyncPanel";
+import LinkedinSyncPanel from "./components/LinkedinSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
 import {
@@ -14,7 +15,7 @@ import {
   StudentProfile,
 } from "./types/careerquest";
 
-describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel and GithubSyncPanel components", () => {
+describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel, GithubSyncPanel and LinkedinSyncPanel components", () => {
   afterEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
@@ -286,5 +287,42 @@ describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel and GithubSyncPanel com
 
     fireEvent.click(screen.getByTestId("github-sync-button"));
     expect(syncGithubCallback).toHaveBeenCalledWith("frank-kenfack");
+  });
+
+  it("renders LinkedinSyncPanel achievements and imports certification", () => {
+    const syncLinkedinCallback = vi.fn();
+    const sampleAchievements: ExternalAchievementItem[] = [
+      {
+        id: 2,
+        provider: "linkedin",
+        external_key: "linkedin-profile-connected",
+        title: "Profil professionnel LinkedIn verifie",
+        xp_awarded: 75,
+        synced_at: "2026-11-20T19:05:00Z",
+      },
+    ];
+
+    render(
+      <LinkedinSyncPanel
+        initialLinkedinUrl="https://www.linkedin.com/in/frank-kenfack"
+        achievements={sampleAchievements}
+        isSyncing={false}
+        onSyncLinkedin={syncLinkedinCallback}
+      />
+    );
+
+    expect(screen.getByTestId("linkedin-achievements-counter")).toHaveTextContent(
+      "1 accomplissements LinkedIn (+75 XP)"
+    );
+    expect(
+      screen.getByTestId("linkedin-achievement-linkedin-profile-connected")
+    ).toHaveTextContent("Profil professionnel LinkedIn verifie");
+
+    fireEvent.click(screen.getByTestId("linkedin-sync-button"));
+    expect(syncLinkedinCallback).toHaveBeenCalledWith(
+      "https://www.linkedin.com/in/frank-kenfack",
+      "Kubernetes & Cloud Native DevOps",
+      "Linux Foundation"
+    );
   });
 });

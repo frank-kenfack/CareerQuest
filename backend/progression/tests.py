@@ -390,3 +390,63 @@ class GithubIntegrationSyncTest(TestCase):
         response = self.api_client.post(reverse("github-sync"), {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("identifiant GitHub", response.json()["detail"])
+
+
+class LinkedinIntegrationSyncTest(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        register_response = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "lucas_linkedin",
+                "email": "lucas@careerquest.fr",
+                "password": "StrongPassword2026!",
+                "school_name": "Epitech Digital",
+            },
+            format="json",
+        )
+        self.access_token = register_response.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+    def test_linkedin_sync_links_profile_imports_certification_and_awards_xp(self):
+        response = self.api_client.post(
+            reverse("linkedin-sync"),
+            {
+                "linkedin_profile_url": "https://www.linkedin.com/in/frank-kenfack",
+                "certification_title": "Kubernetes Administrator (CKA)",
+                "certification_issuer": "Linux Foundation",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["linkedin_profile_url"], "https://www.linkedin.com/in/frank-kenfack")
+        self.assertEqual(payload["newly_awarded_xp"], 225)
+        self.assertEqual(len(payload["newly_unlocked_achievements"]), 2)
+        self.assertEqual(payload["avatar"]["experience_points"], 225)
+        self.assertEqual(payload["avatar"]["level"], 3)
+        self.assertEqual(payload["avatar"]["visual_tier"], "apprenti")
+
+    def test_linkedin_sync_is_idempotent_for_same_certification(self):
+        sync_body = {
+            "linkedin_profile_url": "https://www.linkedin.com/in/frank-kenfack",
+            "certification_title": "Docker Certified Associate",
+            "certification_issuer": "Docker Inc",
+        }
+        first_response = self.api_client.post(reverse("linkedin-sync"), sync_body, format="json")
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.json()["newly_awarded_xp"], 225)
+
+        second_response = self.api_client.post(reverse("linkedin-sync"), sync_body, format="json")
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.json()["newly_awarded_xp"], 0)
+        self.assertEqual(second_response.json()["avatar"]["experience_points"], 225)
+
+    def test_linkedin_sync_rejects_invalid_linkedin_url(self):
+        response = self.api_client.post(
+            reverse("linkedin-sync"),
+            {"linkedin_profile_url": "https://example.com/not-linkedin"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("linkedin.com/in/", response.json()["detail"])

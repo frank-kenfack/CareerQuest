@@ -2,6 +2,7 @@ from django.db import connections, transaction
 from django.db.utils import OperationalError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -30,6 +31,7 @@ from progression.serializers import (
     AwardExperienceSerializer,
     ExternalAchievementSerializer,
     GithubSyncInputSerializer,
+    LinkedinSyncInputSerializer,
     QuestCompletionInputSerializer,
     QuestSerializer,
     SchoolSerializer,
@@ -428,6 +430,103 @@ def sync_github_achievements(request):
         {
             "github_username": target_github_username,
             "repositories_analyzed_count": len(repositories_list),
+            "newly_awarded_xp": newly_awarded_xp,
+            "newly_unlocked_achievements": ExternalAchievementSerializer(
+                newly_created_records,
+                many=True,
+            ).data,
+            "all_achievements": ExternalAchievementSerializer(
+                all_student_achievements,
+                many=True,
+            ).data,
+            "avatar": AvatarSerializer(student_avatar).data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def sync_linkedin_achievements(request):
+    input_serializer = LinkedinSyncInputSerializer(data=request.data)
+    input_serializer.is_valid(raise_exception=True)
+
+    student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    student_avatar, _ = Avatar.objects.get_or_create(student=student_profile)
+
+    provided_url = input_serializer.validated_data.get("linkedin_profile_url", "").strip()
+    target_linkedin_url = provided_url or student_profile.linkedin_profile_url.strip()
+
+    if not target_linkedin_url or "linkedin.com/in/" not in target_linkedin_url.lower():
+        return Response(
+            {
+                "detail": (
+                    "Veuillez renseigner une URL de profil LinkedIn valide "
+                    "(ex. https://www.linkedin.com/in/votre-profil)."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    certification_title = input_serializer.validated_data.get("certification_title", "").strip()
+    certification_issuer = (
+        input_serializer.validated_data.get("certification_issuer", "").strip()
+        or "LinkedIn Learning"
+    )
+
+    candidate_achievements = [
+        {
+            "external_key": "linkedin-profile-connected",
+            "title": "Profil professionnel LinkedIn verifie",
+            "xp_awarded": 75,
+        }
+    ]
+
+    if certification_title:
+        cert_slug = slugify(certification_title)[:80] or "certification"
+        candidate_achievements.append(
+            {
+                "external_key": f"linkedin-cert-{cert_slug}",
+                "title": f"Certification LinkedIn : {certification_title} ({certification_issuer})",
+                "xp_awarded": 150,
+            }
+        )
+
+    newly_created_records = []
+    newly_awarded_xp = 0
+
+    with transaction.atomic():
+        if target_linkedin_url != student_profile.linkedin_profile_url:
+            student_profile.linkedin_profile_url = target_linkedin_url
+            student_profile.save(update_fields=["linkedin_profile_url"])
+
+        existing_keys = set(
+            ExternalAchievement.objects.filter(
+                student=student_profile,
+                provider="linkedin",
+            ).values_list("external_key", flat=True)
+        )
+
+        for candidate in candidate_achievements:
+            if candidate["external_key"] not in existing_keys:
+                created_record = ExternalAchievement.objects.create(
+                    student=student_profile,
+                    provider="linkedin",
+                    external_key=candidate["external_key"],
+                    title=candidate["title"],
+                    xp_awarded=candidate["xp_awarded"],
+                )
+                newly_created_records.append(created_record)
+                newly_awarded_xp += candidate["xp_awarded"]
+
+        if newly_awarded_xp > 0:
+            student_avatar.award_experience(newly_awarded_xp)
+
+    all_student_achievements = ExternalAchievement.objects.filter(student=student_profile)
+
+    return Response(
+        {
+            "linkedin_profile_url": target_linkedin_url,
             "newly_awarded_xp": newly_awarded_xp,
             "newly_unlocked_achievements": ExternalAchievementSerializer(
                 newly_created_records,
