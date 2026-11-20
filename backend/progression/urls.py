@@ -2,12 +2,15 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from progression.views import (
     award_avatar_experience,
+    complete_quest,
     current_student_profile,
     health_check,
     list_avatar_progression_tiers,
+    list_quests,
     list_schools,
     list_skill_tree,
     register_student,
+    start_quest,
     unlock_skill_node,
 )
 
@@ -22,4 +25,7 @@ urlpatterns = [
     path("avatar/award-xp/", award_avatar_experience, name="avatar-award-xp"),
     path("skills/", list_skill_tree, name="skill-tree-list"),
     path("skills/<int:skill_id>/unlock/", unlock_skill_node, name="skill-node-unlock"),
+    path("quests/", list_quests, name="quest-list"),
+    path("quests/<int:quest_id>/start/", start_quest, name="quest-start"),
+    path("quests/<int:quest_id>/complete/", complete_quest, name="quest-complete"),
 ]

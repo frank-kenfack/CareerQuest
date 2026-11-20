@@ -105,6 +105,57 @@ DEFAULT_SKILL_TREE_NODES = [
     },
 ]
 
+DEFAULT_QUEST_CATALOG = [
+    {
+        "code": "quest-docker-stack",
+        "title": "Deployer une architecture 3 conteneurs Docker",
+        "quest_type": "project",
+        "description": "Orchestrer PostgreSQL, Django et Nginx/React via Docker Compose avec volumes persistants.",
+        "xp_reward": 150,
+        "related_skill_code": "docker-containers",
+    },
+    {
+        "code": "quest-rest-jwt",
+        "title": "Construire une API REST Django securisee par JWT",
+        "quest_type": "project",
+        "description": "Implementer l'inscription, l'authentification par jetons et la protection des routes.",
+        "xp_reward": 150,
+        "related_skill_code": "jwt-security",
+    },
+    {
+        "code": "quest-react-vitest",
+        "title": "Atelier Tests Composants React avec Vitest",
+        "quest_type": "training",
+        "description": "Ecrire une suite de tests unitaires automatises verifiant le rendu des composants.",
+        "xp_reward": 120,
+        "related_skill_code": "react-architecture",
+    },
+    {
+        "code": "quest-gitlab-pipeline",
+        "title": "Formation Industrialisation GitLab CI/CD",
+        "quest_type": "training",
+        "description": "Automatiser les etapes validate, test, build et deploy dans un pipeline continu.",
+        "xp_reward": 120,
+        "related_skill_code": "gitlab-cicd",
+    },
+    {
+        "code": "quest-cka-kubernetes",
+        "title": "Certification Cloud Native Kubernetes (CKA)",
+        "quest_type": "certification",
+        "description": "Valider le deploiement d'un cluster Kubernetes avec Services, PVC et Ingress.",
+        "xp_reward": 250,
+        "related_skill_code": "kubernetes-cluster",
+    },
+    {
+        "code": "quest-nginx-ingress",
+        "title": "Certification Architecture Reseau & Ingress",
+        "quest_type": "certification",
+        "description": "Maitriser la configuration reverse proxy, l'equilibrage de charge et l'exposition HTTP.",
+        "xp_reward": 180,
+        "related_skill_code": "cloud-networking",
+    },
+]
+
 
 class School(models.Model):
     name = models.CharField(max_length=150, unique=True)
@@ -283,6 +334,67 @@ class UnlockedSkill(models.Model):
         return f"{self.student.user.username} -> {self.skill.code}"
 
 
+class Quest(models.Model):
+    QUEST_TYPE_CHOICES = [
+        ("project", "Projet"),
+        ("training", "Formation"),
+        ("certification", "Certification"),
+    ]
+
+    code = models.CharField(max_length=60, unique=True)
+    title = models.CharField(max_length=150)
+    quest_type = models.CharField(max_length=30, choices=QUEST_TYPE_CHOICES)
+    description = models.TextField()
+    xp_reward = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    related_skill = models.ForeignKey(
+        SkillNode,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quests",
+    )
+
+    class Meta:
+        db_table = "quest"
+        ordering = ["quest_type", "id"]
+
+    def __str__(self):
+        return f"{self.title} ({self.quest_type})"
+
+
+class QuestCompletion(models.Model):
+    STATUS_CHOICES = [
+        ("in_progress", "En cours"),
+        ("completed", "Validee"),
+    ]
+
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="quest_completions",
+    )
+    quest = models.ForeignKey(
+        Quest,
+        on_delete=models.CASCADE,
+        related_name="completions",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="in_progress",
+    )
+    proof_url = models.URLField(max_length=255, blank=True, default="")
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "quest_completion"
+        unique_together = [("student", "quest")]
+        ordering = ["-completed_at", "id"]
+
+    def __str__(self):
+        return f"{self.student.user.username} - {self.quest.code} ({self.status})"
+
+
 def ensure_default_skill_tree():
     created_nodes_by_code = {}
     for node_spec in DEFAULT_SKILL_TREE_NODES:
@@ -304,3 +416,20 @@ def ensure_default_skill_tree():
             },
         )
         created_nodes_by_code[node_spec["code"]] = skill_node
+
+
+def ensure_default_quests():
+    ensure_default_skill_tree()
+    skills_by_code = {skill.code: skill for skill in SkillNode.objects.all()}
+
+    for quest_spec in DEFAULT_QUEST_CATALOG:
+        Quest.objects.update_or_create(
+            code=quest_spec["code"],
+            defaults={
+                "title": quest_spec["title"],
+                "quest_type": quest_spec["quest_type"],
+                "description": quest_spec["description"],
+                "xp_reward": quest_spec["xp_reward"],
+                "related_skill": skills_by_code.get(quest_spec["related_skill_code"]),
+            },
+        )

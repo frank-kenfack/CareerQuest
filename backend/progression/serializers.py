@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
-from progression.models import Avatar, School, SkillNode, StudentProfile
+from progression.models import Avatar, Quest, School, SkillNode, StudentProfile
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -146,3 +146,52 @@ class SkillNodeSerializer(serializers.ModelSerializer):
             return True
 
         return skill_node.parent_skill_id in unlocked_ids
+
+
+class QuestSerializer(serializers.ModelSerializer):
+    related_skill_id = serializers.IntegerField(source="related_skill.id", read_only=True, allow_null=True)
+    related_skill_code = serializers.CharField(source="related_skill.code", read_only=True, allow_null=True)
+    related_skill_name = serializers.CharField(source="related_skill.name", read_only=True, allow_null=True)
+    student_status = serializers.SerializerMethodField()
+    proof_url = serializers.SerializerMethodField()
+    completed_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quest
+        fields = [
+            "id",
+            "code",
+            "title",
+            "quest_type",
+            "description",
+            "xp_reward",
+            "related_skill_id",
+            "related_skill_code",
+            "related_skill_name",
+            "student_status",
+            "proof_url",
+            "completed_at",
+        ]
+
+    def get_student_status(self, quest):
+        completions_by_quest_id = self.context.get("completions_by_quest_id", {})
+        completion_record = completions_by_quest_id.get(quest.id)
+        if not completion_record:
+            return "not_started"
+        return completion_record.status
+
+    def get_proof_url(self, quest):
+        completions_by_quest_id = self.context.get("completions_by_quest_id", {})
+        completion_record = completions_by_quest_id.get(quest.id)
+        return completion_record.proof_url if completion_record else ""
+
+    def get_completed_at(self, quest):
+        completions_by_quest_id = self.context.get("completions_by_quest_id", {})
+        completion_record = completions_by_quest_id.get(quest.id)
+        if completion_record and completion_record.completed_at:
+            return completion_record.completed_at.isoformat()
+        return None
+
+
+class QuestCompletionInputSerializer(serializers.Serializer):
+    proof_url = serializers.URLField(max_length=255, required=False, allow_blank=True, default="")

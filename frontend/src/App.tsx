@@ -10,6 +10,17 @@ import {
   StudentProfile,
 } from "./types/careerquest";
 
+interface QuestPreviewItem {
+  id: number;
+  code: string;
+  title: string;
+  quest_type: "project" | "training" | "certification";
+  description: string;
+  xp_reward: number;
+  related_skill_name: string | null;
+  student_status: "not_started" | "in_progress" | "completed";
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const ACCESS_TOKEN_STORAGE_KEY = "careerquest_access_token";
 
@@ -17,6 +28,7 @@ export default function App() {
   const [backendHealth, setBackendHealth] = useState<HealthStatusPayload | null>(null);
   const [progressionLadder, setProgressionLadder] = useState<ProgressionTiersPayload | null>(null);
   const [skillNodes, setSkillNodes] = useState<SkillNodeItem[]>([]);
+  const [questsPreview, setQuestsPreview] = useState<QuestPreviewItem[]>([]);
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
@@ -40,6 +52,23 @@ export default function App() {
       }
     } catch {
       // Le catalogue est ignore en cas d'erreur reseau lors des tests isoles.
+    }
+  }, []);
+
+  const loadQuestsCatalog = useCallback(async (token: string | null) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/quests/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        return;
+      }
+      const questsPayload = (await response.json()) as QuestPreviewItem[];
+      if (Array.isArray(questsPayload)) {
+        setQuestsPreview(questsPayload);
+      }
+    } catch {
+      // Le catalogue des quetes est ignore lors des tests unitaires isoles.
     }
   }, []);
 
@@ -87,7 +116,8 @@ export default function App() {
 
   useEffect(() => {
     loadSkillTree(accessToken);
-  }, [accessToken, loadSkillTree]);
+    loadQuestsCatalog(accessToken);
+  }, [accessToken, loadSkillTree, loadQuestsCatalog]);
 
   useEffect(() => {
     if (!accessToken || currentStudent) {
@@ -283,7 +313,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Jour 2 validé (Auth JWT, Avatar Évolutif, Arbre de Compétences & CI : 21 tests)
+              Étape 3.1 active (API Système de Quêtes : Projets, Formations, Certifications)
             </span>
           </div>
         </section>
@@ -300,6 +330,52 @@ export default function App() {
             apiBaseUrl={API_BASE_URL}
             onAuthenticated={handleAuthenticated}
           />
+        )}
+
+        {questsPreview.length > 0 && (
+          <section
+            data-testid="quests-catalog-preview"
+            className="rounded-xl border border-slate-800 bg-slate-900 p-6"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  Catalogue Backend des Quêtes ({questsPreview.length} quêtes actives)
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Servi par /api/quests/, /api/quests/{"{id}"}/start/ et /api/quests/{"{id}"}/complete/
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {questsPreview.map((questItem) => (
+                <div
+                  key={questItem.code}
+                  className="rounded-lg border border-slate-800 bg-slate-950 p-4"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="rounded bg-indigo-950 px-2 py-0.5 font-semibold uppercase text-indigo-300">
+                      {questItem.quest_type}
+                    </span>
+                    <span className="font-bold text-emerald-400">
+                      +{questItem.xp_reward} XP
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {questItem.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {questItem.description}
+                  </p>
+                  {questItem.related_skill_name && (
+                    <p className="mt-2 text-xs text-indigo-300">
+                      Compétence liée : {questItem.related_skill_name}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {skillNodes.length > 0 && (

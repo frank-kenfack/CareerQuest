@@ -3,7 +3,14 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from progression.models import Avatar, SkillNode, StudentProfile, ensure_default_skill_tree
+from progression.models import (
+    Avatar,
+    Quest,
+    SkillNode,
+    StudentProfile,
+    ensure_default_quests,
+    ensure_default_skill_tree,
+)
 
 
 class HealthCheckEndpointTest(TestCase):
@@ -229,3 +236,80 @@ class SkillTreeEndpointsTest(TestCase):
         )
         self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("deja debloquee", second_response.json()["detail"])
+
+
+class QuestSystemEndpointsTest(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        ensure_default_quests()
+        register_response = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "thomas_quests",
+                "email": "thomas@careerquest.fr",
+                "password": "StrongPassword2026!",
+                "school_name": "Epitech Digital",
+            },
+            format="json",
+        )
+        self.access_token = register_response.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+    def test_list_quests_returns_all_three_quest_categories_and_filters_by_type(self):
+        all_response = self.api_client.get(reverse("quest-list"))
+        self.assertEqual(all_response.status_code, status.HTTP_200_OK)
+        all_quests = all_response.json()
+        self.assertEqual(len(all_quests), 6)
+        self.assertTrue(all(q["student_status"] == "not_started" for q in all_quests))
+
+        cert_response = self.api_client.get(f"{reverse('quest-list')}?quest_type=certification")
+        self.assertEqual(cert_response.status_code, status.HTTP_200_OK)
+        cert_quests = cert_response.json()
+        self.assertEqual(len(cert_quests), 2)
+        self.assertTrue(all(q["quest_type"] == "certification" for q in cert_quests))
+
+    def test_start_and_complete_quest_awards_xp_and_updates_avatar(self):
+        docker_quest = Quest.objects.get(code="quest-docker-stack")
+
+        start_response = self.api_client.post(
+            reverse("quest-start", kwargs={"quest_id": docker_quest.id}),
+            format="json",
+        )
+        self.assertEqual(start_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(start_response.json()["quest"]["student_status"], "in_progress")
+
+        complete_response = self.api_client.post(
+            reverse("quest-complete", kwargs={"quest_id": docker_quest.id}),
+            {"proof_url": "https://github.com/frank-kenfack/CareerQuest"},
+            format="json",
+        )
+        self.assertEqual(complete_response.status_code, status.HTTP_200_OK)
+        complete_payload = complete_response.json()
+        self.assertEqual(complete_payload["quest"]["student_status"], "completed")
+        self.assertEqual(
+            complete_payload["quest"]["proof_url"],
+            "https://github.com/frank-kenfack/CareerQuest",
+        )
+        self.assertEqual(complete_payload["avatar"]["experience_points"], 150)
+        self.assertEqual(complete_payload["avatar"]["level"], 2)
+
+    def test_completing_same_quest_twice_is_rejected_without_duplicate_xp(self):
+        cka_quest = Quest.objects.get(code="quest-cka-kubernetes")
+
+        first_completion = self.api_client.post(
+            reverse("quest-complete", kwargs={"quest_id": cka_quest.id}),
+            {"proof_url": "https://training.linuxfoundation.org/cka"},
+            format="json",
+        )
+        self.assertEqual(first_completion.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_completion.json()["avatar"]["experience_points"], 250)
+
+        duplicate_completion = self.api_client.post(
+            reverse("quest-complete", kwargs={"quest_id": cka_quest.id}),
+            format="json",
+        )
+        self.assertEqual(duplicate_completion.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("deja ete validee", duplicate_completion.json()["detail"])
+
+        profile_response = self.api_client.get(reverse("auth-me"))
+        self.assertEqual(profile_response.json()["avatar"]["experience_points"], 250)
