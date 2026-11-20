@@ -540,7 +540,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-emerald-500/40 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300">
-              Jour 4 validé (Bonus Kubernetes +20 %, CD, Seed Demo & Persistance PostgreSQL)
+              Version 1.0.0 (Étape 5.1 : Pipeline CI/CD & Pile 3 Conteneurs validés sur main)
             </span>
           </div>
 

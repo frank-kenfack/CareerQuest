@@ -36,7 +36,7 @@ def wait_for_backend_ready(timeout_seconds=45):
 
 
 def verify_live_endpoints():
-    print("==> Verification des points de terminaison HTTP de la pile Docker Compose")
+    print("==> Verification des points de terminaison HTTP Backend (:8000) et Reverse Proxy Nginx (:3000)")
     for endpoint_url in (
         "http://localhost:8000/api/health/",
         "http://localhost:8000/api/avatar/progression-tiers/",
@@ -44,9 +44,20 @@ def verify_live_endpoints():
         "http://localhost:8000/api/quests/",
         "http://localhost:8000/api/leaderboard/students/",
         "http://localhost:8000/api/leaderboard/schools/",
+        "http://localhost:3000/api/health/",
+        "http://localhost:3000/api/leaderboard/students/",
+        "http://localhost:3000/api/leaderboard/schools/",
     ):
         fetch_json_endpoint(endpoint_url)
-        print(f"  OK : {endpoint_url} (HTTP 200)")
+        print(f"  OK : {endpoint_url} (HTTP 200 JSON)")
+
+    with urllib.request.urlopen("http://localhost:3000/", timeout=10) as frontend_response:
+        if frontend_response.status != 200:
+            raise RuntimeError(f"Echec HTTP {frontend_response.status} sur http://localhost:3000/")
+        html_body = frontend_response.read().decode("utf-8")
+        if "CareerQuest" not in html_body:
+            raise RuntimeError("La page d'accueil servie par Nginx ne contient pas CareerQuest.")
+        print("  OK : http://localhost:3000/ (HTTP 200 Frontend React via Nginx)")
 
 
 def verify_database_persistence_across_restart():
