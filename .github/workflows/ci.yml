@@ -7,6 +7,8 @@ on:
       - develop
       - "feature/**"
       - "devops/**"
+      - "release/**"
+      - "docs/**"
   pull_request:
     branches:
       - main
@@ -20,8 +22,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run schema and infrastructure tests
-        run: python -m unittest discover -s tests -v
+      - name: Validate Kubernetes deploy script syntax and run infra tests
+        run: |
+          sh -n scripts/deploy-k8s.sh
+          python -m unittest discover -s tests -v
 
   backend-django-tests:
     runs-on: ubuntu-latest

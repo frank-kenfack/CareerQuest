@@ -2,7 +2,9 @@ from pathlib import Path
 import unittest
 
 
-K8S_DIR = Path(__file__).resolve().parent.parent / "k8s"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+K8S_DIR = ROOT_DIR / "k8s"
+DEPLOY_SCRIPT_PATH = ROOT_DIR / "scripts" / "deploy-k8s.sh"
 
 
 class KubernetesManifestsValidationTest(unittest.TestCase):
@@ -64,6 +66,16 @@ class KubernetesManifestsValidationTest(unittest.TestCase):
         self.assertIn("path: /", ingress_content)
         self.assertIn("name: frontend", ingress_content)
         self.assertIn("number: 80", ingress_content)
+
+    def test_deploy_script_applies_manifests_in_dependency_order_and_checks_rollouts(self):
+        self.assertTrue(DEPLOY_SCRIPT_PATH.exists())
+        script_content = DEPLOY_SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("kubectl apply -f k8s/namespace.yaml", script_content)
+        self.assertIn("kubectl rollout status deployment/careerquest-db -n careerquest", script_content)
+        self.assertIn("kubectl rollout status deployment/careerquest-backend -n careerquest", script_content)
+        self.assertIn("kubectl rollout status deployment/careerquest-frontend -n careerquest", script_content)
+        self.assertIn("kubectl apply -f k8s/ingress.yaml", script_content)
 
 
 if __name__ == "__main__":

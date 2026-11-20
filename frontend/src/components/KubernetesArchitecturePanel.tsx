@@ -13,16 +13,16 @@ export default function KubernetesArchitecturePanel() {
       detail: "ClusterIP :8000 + Sondes readiness/liveness /api/health/",
     },
     {
-      category: "Services & Load Balancing",
-      manifest: "k8s/frontend-deployment.yaml + service",
-      resource: "Deployment careerquest-frontend (2 réplicas)",
-      detail: "ClusterIP :80 + Serveur Nginx SPA haute disponibilité",
-    },
-    {
       category: "Volumes Persistants (PVC)",
       manifest: "k8s/postgres-pvc.yaml + deployment",
       resource: "PVC postgres-pvc (5Gi, ReadWriteOnce)",
       detail: "Monté sur /var/lib/postgresql/data avec sonde pg_isready",
+    },
+    {
+      category: "Automatisation CD GitLab",
+      manifest: "scripts/deploy-k8s.sh + .gitlab-ci.yml",
+      resource: "Stage deploy-production (kubectl rollout)",
+      detail: "Déploiement séquentiel Namespace -> DB/PVC -> Backend -> Frontend -> Ingress",
     },
   ];
 
@@ -34,10 +34,10 @@ export default function KubernetesArchitecturePanel() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
           <h3 className="text-lg font-semibold text-white">
-            Orchestration Kubernetes & Cloud-Native (11 Manifestes k8s/)
+            Orchestration Kubernetes & Déploiement Continu CD (11 Manifestes k8s/)
           </h3>
           <p className="mt-0.5 text-xs text-slate-400">
-            Architecture complète pour le cluster Kubernetes : Namespace, ConfigMap, Secrets, PVC 5Gi, 3 Deployments, 3 Services et Ingress.
+            Architecture complète pour le cluster Kubernetes : Namespace, ConfigMap, Secrets, PVC 5Gi, 3 Deployments, 3 Services, Ingress et script CD.
           </p>
         </div>
 
@@ -45,7 +45,7 @@ export default function KubernetesArchitecturePanel() {
           data-testid="k8s-bonus-badge"
           className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold text-emerald-300"
         >
-          Critères Bonus Kubernetes validés (Services, Ingress, Volumes)
+          Bonus Kubernetes +20 % & Déploiement CD validés
         </span>
       </div>
 
