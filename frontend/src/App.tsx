@@ -540,7 +540,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 4.1 active (Orchestration Kubernetes : Services, Ingress, Volumes Persistants)
+              Étape 4.2 active (Script de déploiement Kubernetes & Pipeline CD)
             </span>
           </div>
         </section>
