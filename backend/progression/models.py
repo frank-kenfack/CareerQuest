@@ -395,6 +395,32 @@ class QuestCompletion(models.Model):
         return f"{self.student.user.username} - {self.quest.code} ({self.status})"
 
 
+class ExternalAchievement(models.Model):
+    PROVIDER_CHOICES = [
+        ("github", "GitHub"),
+        ("linkedin", "LinkedIn"),
+    ]
+
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="external_achievements",
+    )
+    provider = models.CharField(max_length=30, choices=PROVIDER_CHOICES)
+    external_key = models.CharField(max_length=120)
+    title = models.CharField(max_length=150)
+    xp_awarded = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    synced_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "external_achievement"
+        unique_together = [("student", "provider", "external_key")]
+        ordering = ["-synced_at", "id"]
+
+    def __str__(self):
+        return f"{self.student.user.username} [{self.provider}] {self.title}"
+
+
 def ensure_default_skill_tree():
     created_nodes_by_code = {}
     for node_spec in DEFAULT_SKILL_TREE_NODES:

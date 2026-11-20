@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -313,3 +314,79 @@ class QuestSystemEndpointsTest(TestCase):
 
         profile_response = self.api_client.get(reverse("auth-me"))
         self.assertEqual(profile_response.json()["avatar"]["experience_points"], 250)
+
+
+class GithubIntegrationSyncTest(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        register_response = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "sarah_git",
+                "email": "sarah@careerquest.fr",
+                "password": "StrongPassword2026!",
+                "school_name": "Epitech Digital",
+                "github_username": "frank-kenfack",
+            },
+            format="json",
+        )
+        self.access_token = register_response.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+    @patch("progression.views.fetch_github_repositories")
+    def test_github_sync_unlocks_achievements_and_awards_xp(self, mocked_fetch_repos):
+        mocked_fetch_repos.return_value = [
+            {"name": "CareerQuest", "language": "Python"},
+            {"name": "k8s-infra", "language": "TypeScript"},
+        ]
+
+        sync_response = self.api_client.post(
+            reverse("github-sync"),
+            {"github_username": "frank-kenfack"},
+            format="json",
+        )
+        self.assertEqual(sync_response.status_code, status.HTTP_200_OK)
+        sync_payload = sync_response.json()
+
+        self.assertEqual(sync_payload["github_username"], "frank-kenfack")
+        self.assertEqual(sync_payload["repositories_analyzed_count"], 2)
+        self.assertEqual(len(sync_payload["newly_unlocked_achievements"]), 4)
+        self.assertEqual(sync_payload["newly_awarded_xp"], 420)
+        self.assertEqual(sync_payload["avatar"]["experience_points"], 420)
+        self.assertEqual(sync_payload["avatar"]["level"], 5)
+        self.assertEqual(sync_payload["avatar"]["visual_tier"], "confirme")
+
+    @patch("progression.views.fetch_github_repositories")
+    def test_github_sync_is_idempotent_on_repeated_calls(self, mocked_fetch_repos):
+        mocked_fetch_repos.return_value = [
+            {"name": "CareerQuest", "language": "Python"},
+        ]
+
+        first_sync = self.api_client.post(reverse("github-sync"), format="json")
+        self.assertEqual(first_sync.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_sync.json()["newly_awarded_xp"], 420)
+
+        second_sync = self.api_client.post(reverse("github-sync"), format="json")
+        self.assertEqual(second_sync.status_code, status.HTTP_200_OK)
+        second_payload = second_sync.json()
+        self.assertEqual(second_payload["newly_awarded_xp"], 0)
+        self.assertEqual(len(second_payload["newly_unlocked_achievements"]), 0)
+        self.assertEqual(len(second_payload["all_achievements"]), 4)
+        self.assertEqual(second_payload["avatar"]["experience_points"], 420)
+
+    def test_github_sync_rejects_missing_username(self):
+        no_github_register = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "paul_nogit",
+                "email": "paul@careerquest.fr",
+                "password": "StrongPassword2026!",
+            },
+            format="json",
+        )
+        token = no_github_register.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        response = self.api_client.post(reverse("github-sync"), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("identifiant GitHub", response.json()["detail"])
