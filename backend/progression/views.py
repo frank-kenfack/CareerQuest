@@ -1,4 +1,6 @@
 from django.db import connections, transaction
+from django.db.models import Avg, Count, Q, Sum
+from django.db.models.functions import Coalesce
 from django.db.utils import OperationalError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -540,3 +542,81 @@ def sync_linkedin_achievements(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def student_leaderboard(request):
+    students_queryset = (
+        StudentProfile.objects.select_related("user", "school", "avatar")
+        .annotate(
+            unlocked_skills_count=Count("unlocked_skills", distinct=True),
+            completed_quests_count=Count(
+                "quest_completions",
+                filter=Q(quest_completions__status="completed"),
+                distinct=True,
+            ),
+        )
+        .order_by("-avatar__experience_points", "-avatar__level", "user__username")
+    )
+
+    school_id_filter = request.query_params.get("school_id", "").strip()
+    if school_id_filter.isdigit():
+        students_queryset = students_queryset.filter(school_id=int(school_id_filter))
+
+    leaderboard_entries = []
+    for index, profile in enumerate(students_queryset, start=1):
+        avatar_instance = getattr(profile, "avatar", None)
+        leaderboard_entries.append(
+            {
+                "rank": index,
+                "student_id": profile.id,
+                "username": profile.user.username,
+                "school_name": profile.school.name if profile.school else "Independant",
+                "school_city": profile.school.city if profile.school else "",
+                "level": avatar_instance.level if avatar_instance else 1,
+                "experience_points": avatar_instance.experience_points if avatar_instance else 0,
+                "title": avatar_instance.title if avatar_instance else "Novice",
+                "visual_tier": avatar_instance.visual_tier if avatar_instance else "novice",
+                "unlocked_skills_count": profile.unlocked_skills_count,
+                "completed_quests_count": profile.completed_quests_count,
+            }
+        )
+
+    return Response(leaderboard_entries, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def school_leaderboard(request):
+    schools_queryset = (
+        School.objects.annotate(
+            students_count=Count("students", distinct=True),
+            total_experience_points=Coalesce(Sum("students__avatar__experience_points"), 0),
+            average_level_raw=Coalesce(Avg("students__avatar__level"), 1.0),
+        )
+        .order_by("-total_experience_points", "-students_count", "name")
+    )
+
+    school_entries = []
+    for index, school_item in enumerate(schools_queryset, start=1):
+        top_student = (
+            StudentProfile.objects.filter(school=school_item)
+            .select_related("user", "avatar")
+            .order_by("-avatar__experience_points", "user__username")
+            .first()
+        )
+        school_entries.append(
+            {
+                "rank": index,
+                "school_id": school_item.id,
+                "school_name": school_item.name,
+                "city": school_item.city,
+                "students_count": school_item.students_count,
+                "total_experience_points": school_item.total_experience_points,
+                "average_level": round(float(school_item.average_level_raw), 1),
+                "top_student_username": top_student.user.username if top_student else "",
+            }
+        )
+
+    return Response(school_entries, status=status.HTTP_200_OK)

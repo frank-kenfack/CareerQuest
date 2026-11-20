@@ -11,7 +11,9 @@ from progression.views import (
     list_schools,
     list_skill_tree,
     register_student,
+    school_leaderboard,
     start_quest,
+    student_leaderboard,
     sync_github_achievements,
     sync_linkedin_achievements,
     unlock_skill_node,
@@ -34,4 +36,6 @@ urlpatterns = [
     path("integrations/achievements/", list_external_achievements, name="external-achievement-list"),
     path("integrations/github/sync/", sync_github_achievements, name="github-sync"),
     path("integrations/linkedin/sync/", sync_linkedin_achievements, name="linkedin-sync"),
+    path("leaderboard/students/", student_leaderboard, name="leaderboard-students"),
+    path("leaderboard/schools/", school_leaderboard, name="leaderboard-schools"),
 ]

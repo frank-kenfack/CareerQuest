@@ -84,6 +84,31 @@ export interface ExternalAchievementItem {
   synced_at: string;
 }
 
+export interface StudentLeaderboardEntry {
+  rank: number;
+  student_id: number;
+  username: string;
+  school_name: string;
+  school_city: string;
+  level: number;
+  experience_points: number;
+  title: string;
+  visual_tier: AvatarVisualTier;
+  unlocked_skills_count: number;
+  completed_quests_count: number;
+}
+
+export interface SchoolLeaderboardEntry {
+  rank: number;
+  school_id: number;
+  school_name: string;
+  city: string;
+  students_count: number;
+  total_experience_points: number;
+  average_level: number;
+  top_student_username: string;
+}
+
 export interface HealthStatusPayload {
   status: string;
   service: string;
