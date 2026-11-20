@@ -2,6 +2,10 @@ export type AvatarVisualTier = "novice" | "apprenti" | "confirme" | "maitre";
 
 export type SkillCategory = "frontend" | "backend" | "devops" | "cloud";
 
+export type QuestCategory = "project" | "training" | "certification";
+
+export type QuestProgressStatus = "not_started" | "in_progress" | "completed";
+
 export interface SchoolInfo {
   id: number;
   name: string;
@@ -54,6 +58,21 @@ export interface SkillNodeItem {
   parent_skill_name: string | null;
   is_unlocked: boolean;
   is_available: boolean;
+}
+
+export interface QuestItem {
+  id: number;
+  code: string;
+  title: string;
+  quest_type: QuestCategory;
+  description: string;
+  xp_reward: number;
+  related_skill_id: number | null;
+  related_skill_code: string | null;
+  related_skill_name: string | null;
+  student_status: QuestProgressStatus;
+  proof_url: string;
+  completed_at: string | null;
 }
 
 export interface HealthStatusPayload {

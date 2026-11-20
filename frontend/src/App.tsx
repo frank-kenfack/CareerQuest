@@ -1,25 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import AuthenticationPanel from "./components/AuthenticationPanel";
 import AvatarCard from "./components/AvatarCard";
+import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
 import {
   AvatarState,
   HealthStatusPayload,
   ProgressionTiersPayload,
+  QuestItem,
   SkillNodeItem,
   StudentProfile,
 } from "./types/careerquest";
-
-interface QuestPreviewItem {
-  id: number;
-  code: string;
-  title: string;
-  quest_type: "project" | "training" | "certification";
-  description: string;
-  xp_reward: number;
-  related_skill_name: string | null;
-  student_status: "not_started" | "in_progress" | "completed";
-}
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const ACCESS_TOKEN_STORAGE_KEY = "careerquest_access_token";
@@ -28,7 +19,7 @@ export default function App() {
   const [backendHealth, setBackendHealth] = useState<HealthStatusPayload | null>(null);
   const [progressionLadder, setProgressionLadder] = useState<ProgressionTiersPayload | null>(null);
   const [skillNodes, setSkillNodes] = useState<SkillNodeItem[]>([]);
-  const [questsPreview, setQuestsPreview] = useState<QuestPreviewItem[]>([]);
+  const [quests, setQuests] = useState<QuestItem[]>([]);
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
@@ -36,6 +27,7 @@ export default function App() {
   const [currentStudent, setCurrentStudent] = useState<StudentProfile | null>(null);
   const [isUpdatingXp, setIsUpdatingXp] = useState(false);
   const [unlockingSkillId, setUnlockingSkillId] = useState<number | null>(null);
+  const [activeQuestId, setActiveQuestId] = useState<number | null>(null);
   const [lastEvolutionMessage, setLastEvolutionMessage] = useState<string | null>(null);
 
   const loadSkillTree = useCallback(async (token: string | null) => {
@@ -63,9 +55,9 @@ export default function App() {
       if (!response.ok) {
         return;
       }
-      const questsPayload = (await response.json()) as QuestPreviewItem[];
+      const questsPayload = (await response.json()) as QuestItem[];
       if (Array.isArray(questsPayload)) {
-        setQuestsPreview(questsPayload);
+        setQuests(questsPayload);
       }
     } catch {
       // Le catalogue des quetes est ignore lors des tests unitaires isoles.
@@ -257,6 +249,71 @@ export default function App() {
     }
   };
 
+  const handleStartQuest = async (questId: number) => {
+    if (!accessToken || !currentStudent) {
+      return;
+    }
+    setActiveQuestId(questId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/quests/${questId}/start/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const responseBody = await response.json();
+      if (!response.ok) {
+        setLastEvolutionMessage(responseBody.detail || "Impossible de démarrer cette quête.");
+        return;
+      }
+      await loadQuestsCatalog(accessToken);
+      setLastEvolutionMessage(`Quête « ${responseBody.quest.title} » démarrée.`);
+    } finally {
+      setActiveQuestId(null);
+    }
+  };
+
+  const handleCompleteQuest = async (questId: number, proofUrl: string) => {
+    if (!accessToken || !currentStudent) {
+      return;
+    }
+    setActiveQuestId(questId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/quests/${questId}/complete/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ proof_url: proofUrl }),
+      });
+      const responseBody = await response.json();
+      if (!response.ok) {
+        setLastEvolutionMessage(responseBody.detail || "Impossible de valider cette quête.");
+        return;
+      }
+
+      const completedPayload = responseBody as {
+        quest: QuestItem;
+        avatar: AvatarState;
+      };
+
+      setCurrentStudent({
+        ...currentStudent,
+        avatar: completedPayload.avatar,
+      });
+      await loadQuestsCatalog(accessToken);
+      await loadSkillTree(accessToken);
+
+      setLastEvolutionMessage(
+        `Quête « ${completedPayload.quest.title} » validée (+${completedPayload.quest.xp_reward} XP) : Avatar niveau ${completedPayload.avatar.level} (${completedPayload.avatar.title}) !`
+      );
+    } finally {
+      setActiveQuestId(null);
+    }
+  };
+
   const formatHealthBadge = (healthPayload: HealthStatusPayload) => {
     if (healthPayload.database_engine) {
       return `API active (${healthPayload.database} : ${healthPayload.database_engine})`;
@@ -313,7 +370,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 3.1 active (API Système de Quêtes : Projets, Formations, Certifications)
+              Étape 3.2 active (Journal de Quêtes Interactif)
             </span>
           </div>
         </section>
@@ -332,50 +389,14 @@ export default function App() {
           />
         )}
 
-        {questsPreview.length > 0 && (
-          <section
-            data-testid="quests-catalog-preview"
-            className="rounded-xl border border-slate-800 bg-slate-900 p-6"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-semibold text-white">
-                  Catalogue Backend des Quêtes ({questsPreview.length} quêtes actives)
-                </h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  Servi par /api/quests/, /api/quests/{"{id}"}/start/ et /api/quests/{"{id}"}/complete/
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {questsPreview.map((questItem) => (
-                <div
-                  key={questItem.code}
-                  className="rounded-lg border border-slate-800 bg-slate-950 p-4"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="rounded bg-indigo-950 px-2 py-0.5 font-semibold uppercase text-indigo-300">
-                      {questItem.quest_type}
-                    </span>
-                    <span className="font-bold text-emerald-400">
-                      +{questItem.xp_reward} XP
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    {questItem.title}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {questItem.description}
-                  </p>
-                  {questItem.related_skill_name && (
-                    <p className="mt-2 text-xs text-indigo-300">
-                      Compétence liée : {questItem.related_skill_name}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
+        {quests.length > 0 && (
+          <QuestLogPanel
+            quests={quests}
+            isAuthenticated={Boolean(currentStudent)}
+            activeQuestId={activeQuestId}
+            onStartQuest={handleStartQuest}
+            onCompleteQuest={handleCompleteQuest}
+          />
         )}
 
         {skillNodes.length > 0 && (
