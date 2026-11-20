@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import AuthenticationPanel from "./components/AuthenticationPanel";
 import AvatarCard from "./components/AvatarCard";
 import GithubSyncPanel from "./components/GithubSyncPanel";
+import KubernetesArchitecturePanel from "./components/KubernetesArchitecturePanel";
 import LeaderboardPanel from "./components/LeaderboardPanel";
 import LinkedinSyncPanel from "./components/LinkedinSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
@@ -539,10 +540,12 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Jour 3 validé (5 Fonctionnalités Core : Avatar, Quêtes, Arbre, GitHub/LinkedIn & Classements)
+              Étape 4.1 active (Orchestration Kubernetes : Services, Ingress, Volumes Persistants)
             </span>
           </div>
         </section>
+
+        <KubernetesArchitecturePanel />
 
         {currentStudent ? (
           <>

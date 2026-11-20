@@ -82,6 +82,7 @@ describe("CareerQuest UI Components", () => {
         "API active (connected)"
       );
       expect(screen.getByText("Apprenti DevOps")).toBeInTheDocument();
+      expect(screen.getByTestId("kubernetes-architecture-panel")).toBeInTheDocument();
     });
   });
 
