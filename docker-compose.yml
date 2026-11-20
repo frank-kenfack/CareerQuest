@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: careerquest-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-careerquest}
+      POSTGRES_USER: ${POSTGRES_USER:-careerquest_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-careerquest_password}
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-careerquest_user} -d $${POSTGRES_DB:-careerquest}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - careerquest-network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: careerquest-backend
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-careerquest}
+      POSTGRES_USER: ${POSTGRES_USER:-careerquest_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-careerquest_password}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-careerquest-compose-development-secret-key-2026}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,testserver}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - careerquest-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: careerquest-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - careerquest-network
+
+volumes:
+  postgres_storage:
+
+networks:
+  careerquest-network:
+    driver: bridge

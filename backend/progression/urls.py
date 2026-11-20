@@ -1,0 +1,41 @@
+from django.urls import path
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from progression.views import (
+    award_avatar_experience,
+    complete_quest,
+    current_student_profile,
+    health_check,
+    list_avatar_progression_tiers,
+    list_external_achievements,
+    list_quests,
+    list_schools,
+    list_skill_tree,
+    register_student,
+    school_leaderboard,
+    start_quest,
+    student_leaderboard,
+    sync_github_achievements,
+    sync_linkedin_achievements,
+    unlock_skill_node,
+)
+
+urlpatterns = [
+    path("health/", health_check, name="health-check"),
+    path("auth/register/", register_student, name="auth-register"),
+    path("auth/login/", TokenObtainPairView.as_view(), name="auth-login"),
+    path("auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
+    path("auth/me/", current_student_profile, name="auth-me"),
+    path("schools/", list_schools, name="school-list"),
+    path("avatar/progression-tiers/", list_avatar_progression_tiers, name="avatar-progression-tiers"),
+    path("avatar/award-xp/", award_avatar_experience, name="avatar-award-xp"),
+    path("skills/", list_skill_tree, name="skill-tree-list"),
+    path("skills/<int:skill_id>/unlock/", unlock_skill_node, name="skill-node-unlock"),
+    path("quests/", list_quests, name="quest-list"),
+    path("quests/<int:quest_id>/start/", start_quest, name="quest-start"),
+    path("quests/<int:quest_id>/complete/", complete_quest, name="quest-complete"),
+    path("integrations/achievements/", list_external_achievements, name="external-achievement-list"),
+    path("integrations/github/sync/", sync_github_achievements, name="github-sync"),
+    path("integrations/linkedin/sync/", sync_linkedin_achievements, name="linkedin-sync"),
+    path("leaderboard/students/", student_leaderboard, name="leaderboard-students"),
+    path("leaderboard/schools/", school_leaderboard, name="leaderboard-schools"),
+]
