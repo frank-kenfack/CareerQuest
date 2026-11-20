@@ -96,7 +96,7 @@ class Command(BaseCommand):
                 username=student_spec["username"],
                 defaults={"email": student_spec["email"]},
             )
-            if was_created:
+            if was_created or not user_account.password:
                 user_account.set_password("StrongPassword2026!")
                 user_account.save()
 
