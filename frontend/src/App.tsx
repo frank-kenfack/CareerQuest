@@ -540,7 +540,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-emerald-500/40 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300">
-              Version 1.0.0 (Étape 5.1 : Pipeline CI/CD & Pile 3 Conteneurs validés sur main)
+              Version 1.0.0 Finale (Jour 5 validé : 5 Fonctionnalités Core, 3 Conteneurs, CI/CD & Bonus Kubernetes +20 %)
             </span>
           </div>
 
