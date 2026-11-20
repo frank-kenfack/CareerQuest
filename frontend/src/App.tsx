@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import AuthenticationPanel from "./components/AuthenticationPanel";
 import AvatarCard from "./components/AvatarCard";
+import GithubSyncPanel from "./components/GithubSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
 import {
   AvatarState,
+  ExternalAchievementItem,
   HealthStatusPayload,
   ProgressionTiersPayload,
   QuestItem,
@@ -20,6 +22,7 @@ export default function App() {
   const [progressionLadder, setProgressionLadder] = useState<ProgressionTiersPayload | null>(null);
   const [skillNodes, setSkillNodes] = useState<SkillNodeItem[]>([]);
   const [quests, setQuests] = useState<QuestItem[]>([]);
+  const [externalAchievements, setExternalAchievements] = useState<ExternalAchievementItem[]>([]);
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
@@ -28,6 +31,7 @@ export default function App() {
   const [isUpdatingXp, setIsUpdatingXp] = useState(false);
   const [unlockingSkillId, setUnlockingSkillId] = useState<number | null>(null);
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null);
+  const [isSyncingGithub, setIsSyncingGithub] = useState(false);
   const [lastEvolutionMessage, setLastEvolutionMessage] = useState<string | null>(null);
 
   const loadSkillTree = useCallback(async (token: string | null) => {
@@ -61,6 +65,27 @@ export default function App() {
       }
     } catch {
       // Le catalogue des quetes est ignore lors des tests unitaires isoles.
+    }
+  }, []);
+
+  const loadExternalAchievements = useCallback(async (token: string | null) => {
+    if (!token) {
+      setExternalAchievements([]);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/integrations/achievements/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        return;
+      }
+      const achievementsPayload = (await response.json()) as ExternalAchievementItem[];
+      if (Array.isArray(achievementsPayload)) {
+        setExternalAchievements(achievementsPayload);
+      }
+    } catch {
+      // Les accomplissements externes sont ignores lors des tests unitaires isoles.
     }
   }, []);
 
@@ -109,7 +134,8 @@ export default function App() {
   useEffect(() => {
     loadSkillTree(accessToken);
     loadQuestsCatalog(accessToken);
-  }, [accessToken, loadSkillTree, loadQuestsCatalog]);
+    loadExternalAchievements(accessToken);
+  }, [accessToken, loadSkillTree, loadQuestsCatalog, loadExternalAchievements]);
 
   useEffect(() => {
     if (!accessToken || currentStudent) {
@@ -156,6 +182,7 @@ export default function App() {
     localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
     setAccessToken(null);
     setCurrentStudent(null);
+    setExternalAchievements([]);
     setLastEvolutionMessage(null);
   };
 
@@ -314,6 +341,52 @@ export default function App() {
     }
   };
 
+  const handleSyncGithub = async (githubUsername: string) => {
+    if (!accessToken || !currentStudent) {
+      return;
+    }
+    setIsSyncingGithub(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/integrations/github/sync/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ github_username: githubUsername }),
+      });
+      const responseBody = await response.json();
+      if (!response.ok) {
+        setLastEvolutionMessage(
+          responseBody.detail || "Impossible de synchroniser le compte GitHub."
+        );
+        return;
+      }
+
+      const syncPayload = responseBody as {
+        github_username: string;
+        repositories_analyzed_count: number;
+        newly_awarded_xp: number;
+        all_achievements: ExternalAchievementItem[];
+        avatar: AvatarState;
+      };
+
+      setCurrentStudent({
+        ...currentStudent,
+        github_username: syncPayload.github_username,
+        avatar: syncPayload.avatar,
+      });
+      setExternalAchievements(syncPayload.all_achievements);
+      await loadSkillTree(accessToken);
+
+      setLastEvolutionMessage(
+        `Synchronisation GitHub @${syncPayload.github_username} terminée (${syncPayload.repositories_analyzed_count} dépôts analysés, +${syncPayload.newly_awarded_xp} XP) : Avatar niveau ${syncPayload.avatar.level} !`
+      );
+    } finally {
+      setIsSyncingGithub(false);
+    }
+  };
+
   const formatHealthBadge = (healthPayload: HealthStatusPayload) => {
     if (healthPayload.database_engine) {
       return `API active (${healthPayload.database} : ${healthPayload.database_engine})`;
@@ -370,18 +443,26 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 3.2 active (Journal de Quêtes Interactif)
+              Étape 3.3 active (Synchronisation GitHub API & Achievements)
             </span>
           </div>
         </section>
 
         {currentStudent ? (
-          <AvatarCard
-            studentProfile={currentStudent}
-            onGainExperience={handleGainExperience}
-            isUpdatingXp={isUpdatingXp}
-            lastEvolutionMessage={lastEvolutionMessage}
-          />
+          <>
+            <AvatarCard
+              studentProfile={currentStudent}
+              onGainExperience={handleGainExperience}
+              isUpdatingXp={isUpdatingXp}
+              lastEvolutionMessage={lastEvolutionMessage}
+            />
+            <GithubSyncPanel
+              initialGithubUsername={currentStudent.github_username}
+              achievements={externalAchievements}
+              isSyncing={isSyncingGithub}
+              onSyncGithub={handleSyncGithub}
+            />
+          </>
         ) : (
           <AuthenticationPanel
             apiBaseUrl={API_BASE_URL}

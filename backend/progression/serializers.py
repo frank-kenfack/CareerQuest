@@ -1,7 +1,14 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
-from progression.models import Avatar, Quest, School, SkillNode, StudentProfile
+from progression.models import (
+    Avatar,
+    ExternalAchievement,
+    Quest,
+    School,
+    SkillNode,
+    StudentProfile,
+)
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -195,3 +202,20 @@ class QuestSerializer(serializers.ModelSerializer):
 
 class QuestCompletionInputSerializer(serializers.Serializer):
     proof_url = serializers.URLField(max_length=255, required=False, allow_blank=True, default="")
+
+
+class ExternalAchievementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExternalAchievement
+        fields = [
+            "id",
+            "provider",
+            "external_key",
+            "title",
+            "xp_awarded",
+            "synced_at",
+        ]
+
+
+class GithubSyncInputSerializer(serializers.Serializer):
+    github_username = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")

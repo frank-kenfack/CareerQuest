@@ -4,11 +4,17 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import AvatarCard from "./components/AvatarCard";
+import GithubSyncPanel from "./components/GithubSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
-import { QuestItem, SkillNodeItem, StudentProfile } from "./types/careerquest";
+import {
+  ExternalAchievementItem,
+  QuestItem,
+  SkillNodeItem,
+  StudentProfile,
+} from "./types/careerquest";
 
-describe("App, AvatarCard, SkillTreeBoard and QuestLogPanel components", () => {
+describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel and GithubSyncPanel components", () => {
   afterEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
@@ -31,7 +37,11 @@ describe("App, AvatarCard, SkillTreeBoard and QuestLogPanel components", () => {
         } as Response;
       }
 
-      if (requestUrl.includes("/skills/") || requestUrl.includes("/quests/")) {
+      if (
+        requestUrl.includes("/skills/") ||
+        requestUrl.includes("/quests/") ||
+        requestUrl.includes("/integrations/achievements/")
+      ) {
         return {
           ok: true,
           status: 200,
@@ -243,5 +253,38 @@ describe("App, AvatarCard, SkillTreeBoard and QuestLogPanel components", () => {
     fireEvent.click(screen.getByTestId("filter-quest-certification"));
     expect(screen.getByTestId("quest-card-quest-cka-kubernetes")).toBeInTheDocument();
     expect(screen.queryByTestId("quest-card-quest-docker-stack")).not.toBeInTheDocument();
+  });
+
+  it("renders GithubSyncPanel achievements and triggers synchronization", () => {
+    const syncGithubCallback = vi.fn();
+    const sampleAchievements: ExternalAchievementItem[] = [
+      {
+        id: 1,
+        provider: "github",
+        external_key: "github-careerquest-repository",
+        title: "Architecte du depot GitHub CareerQuest",
+        xp_awarded: 150,
+        synced_at: "2026-11-20T19:00:00Z",
+      },
+    ];
+
+    render(
+      <GithubSyncPanel
+        initialGithubUsername="frank-kenfack"
+        achievements={sampleAchievements}
+        isSyncing={false}
+        onSyncGithub={syncGithubCallback}
+      />
+    );
+
+    expect(screen.getByTestId("github-achievements-counter")).toHaveTextContent(
+      "1 accomplissements GitHub (+150 XP)"
+    );
+    expect(
+      screen.getByTestId("github-achievement-github-careerquest-repository")
+    ).toHaveTextContent("Architecte du depot GitHub CareerQuest");
+
+    fireEvent.click(screen.getByTestId("github-sync-button"));
+    expect(syncGithubCallback).toHaveBeenCalledWith("frank-kenfack");
   });
 });

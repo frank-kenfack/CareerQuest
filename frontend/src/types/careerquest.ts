@@ -75,6 +75,15 @@ export interface QuestItem {
   completed_at: string | null;
 }
 
+export interface ExternalAchievementItem {
+  id: number;
+  provider: "github" | "linkedin";
+  external_key: string;
+  title: string;
+  xp_awarded: number;
+  synced_at: string;
+}
+
 export interface HealthStatusPayload {
   status: string;
   service: string;

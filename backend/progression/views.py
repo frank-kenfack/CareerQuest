@@ -7,9 +7,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from progression.github_sync import (
+    GithubSyncError,
+    evaluate_github_achievements,
+    fetch_github_repositories,
+)
 from progression.models import (
     AVATAR_PROGRESSION_TIERS,
     Avatar,
+    ExternalAchievement,
     Quest,
     QuestCompletion,
     School,
@@ -22,6 +28,8 @@ from progression.models import (
 from progression.serializers import (
     AvatarSerializer,
     AwardExperienceSerializer,
+    ExternalAchievementSerializer,
+    GithubSyncInputSerializer,
     QuestCompletionInputSerializer,
     QuestSerializer,
     SchoolSerializer,
@@ -336,6 +344,99 @@ def complete_quest(request, quest_id):
         {
             "quest": serialized_quest,
             "progression": progression_summary,
+            "avatar": AvatarSerializer(student_avatar).data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_external_achievements(request):
+    student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    achievements = ExternalAchievement.objects.filter(student=student_profile)
+    return Response(
+        ExternalAchievementSerializer(achievements, many=True).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def sync_github_achievements(request):
+    input_serializer = GithubSyncInputSerializer(data=request.data)
+    input_serializer.is_valid(raise_exception=True)
+
+    student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    student_avatar, _ = Avatar.objects.get_or_create(student=student_profile)
+
+    provided_username = input_serializer.validated_data.get("github_username", "").strip()
+    target_github_username = provided_username or student_profile.github_username.strip()
+
+    if not target_github_username:
+        return Response(
+            {"detail": "Veuillez renseigner un identifiant GitHub pour lancer la synchronisation."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        repositories_list = fetch_github_repositories(target_github_username)
+    except GithubSyncError as sync_error:
+        return Response(
+            {"detail": str(sync_error)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    evaluated_achievements = evaluate_github_achievements(
+        target_github_username,
+        repositories_list,
+    )
+
+    newly_created_records = []
+    newly_awarded_xp = 0
+
+    with transaction.atomic():
+        if provided_username and provided_username != student_profile.github_username:
+            student_profile.github_username = provided_username
+            student_profile.save(update_fields=["github_username"])
+
+        existing_keys = set(
+            ExternalAchievement.objects.filter(
+                student=student_profile,
+                provider="github",
+            ).values_list("external_key", flat=True)
+        )
+
+        for candidate in evaluated_achievements:
+            if candidate["external_key"] not in existing_keys:
+                created_record = ExternalAchievement.objects.create(
+                    student=student_profile,
+                    provider="github",
+                    external_key=candidate["external_key"],
+                    title=candidate["title"],
+                    xp_awarded=candidate["xp_awarded"],
+                )
+                newly_created_records.append(created_record)
+                newly_awarded_xp += candidate["xp_awarded"]
+
+        if newly_awarded_xp > 0:
+            student_avatar.award_experience(newly_awarded_xp)
+
+    all_student_achievements = ExternalAchievement.objects.filter(student=student_profile)
+
+    return Response(
+        {
+            "github_username": target_github_username,
+            "repositories_analyzed_count": len(repositories_list),
+            "newly_awarded_xp": newly_awarded_xp,
+            "newly_unlocked_achievements": ExternalAchievementSerializer(
+                newly_created_records,
+                many=True,
+            ).data,
+            "all_achievements": ExternalAchievementSerializer(
+                all_student_achievements,
+                many=True,
+            ).data,
             "avatar": AvatarSerializer(student_avatar).data,
         },
         status=status.HTTP_200_OK,
