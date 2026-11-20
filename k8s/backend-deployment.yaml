@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: careerquest-backend
+  namespace: careerquest
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: careerquest-backend
+  template:
+    metadata:
+      labels:
+        app: careerquest-backend
+    spec:
+      containers:
+        - name: backend
+          image: careerquest-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: careerquest-config
+            - secretRef:
+                name: careerquest-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/health/
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health/
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
