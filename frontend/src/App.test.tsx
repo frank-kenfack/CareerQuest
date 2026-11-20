@@ -83,6 +83,10 @@ describe("CareerQuest UI Components", () => {
       );
       expect(screen.getByText("Apprenti DevOps")).toBeInTheDocument();
       expect(screen.getByTestId("kubernetes-architecture-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("section-navigation")).toBeInTheDocument();
+      expect(screen.getByTestId("persistence-indicator")).toHaveTextContent(
+        "Persistance PostgreSQL 16"
+      );
     });
   });
 

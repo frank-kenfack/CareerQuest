@@ -539,67 +539,137 @@ export default function App() {
                 Accomplissez des quêtes, validez des compétences techniques et faites évoluer votre avatar.
               </p>
             </div>
-            <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 4.3 active (Jeu de données de démonstration seed_demo : 4 Écoles & 5 Profils)
+            <span className="rounded-md border border-emerald-500/40 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300">
+              Jour 4 validé (Bonus Kubernetes +20 %, CD, Seed Demo & Persistance PostgreSQL)
             </span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
+            <nav
+              aria-label="Navigation rapide des fonctionnalités"
+              data-testid="section-navigation"
+              className="flex flex-wrap items-center gap-2"
+            >
+              <a
+                href="#section-avatar"
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
+              >
+                1. Avatar Évolutif
+              </a>
+              <a
+                href="#section-competences"
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
+              >
+                2. Arbre de Compétences ({skillNodes.length})
+              </a>
+              <a
+                href="#section-quetes"
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
+              >
+                3. Quêtes ({quests.length})
+              </a>
+              <a
+                href="#section-integrations"
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
+              >
+                4. GitHub & LinkedIn
+              </a>
+              <a
+                href="#section-classements"
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
+              >
+                5. Classements ({studentLeaderboard.length} étudiants / {schoolLeaderboard.length} écoles)
+              </a>
+              <a
+                href="#section-kubernetes"
+                className="rounded-lg border border-indigo-500/40 bg-indigo-950/40 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:border-indigo-400"
+              >
+                Bonus Kubernetes (11 manifestes)
+              </a>
+            </nav>
+
+            <div
+              data-testid="persistence-indicator"
+              className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300"
+            >
+              Persistance PostgreSQL 16 :{" "}
+              <span className="font-semibold text-emerald-300">
+                {backendHealth?.registered_students_count ?? studentLeaderboard.length} profils actifs
+              </span>{" "}
+              (Volume Docker & PVC Kubernetes 5Gi)
+            </div>
           </div>
         </section>
 
-        <KubernetesArchitecturePanel />
+        <div id="section-kubernetes" className="scroll-mt-6">
+          <KubernetesArchitecturePanel />
+        </div>
 
         {currentStudent ? (
           <>
-            <AvatarCard
-              studentProfile={currentStudent}
-              onGainExperience={handleGainExperience}
-              isUpdatingXp={isUpdatingXp}
-              lastEvolutionMessage={lastEvolutionMessage}
-            />
-            <GithubSyncPanel
-              initialGithubUsername={currentStudent.github_username}
-              achievements={externalAchievements}
-              isSyncing={isSyncingGithub}
-              onSyncGithub={handleSyncGithub}
-            />
-            <LinkedinSyncPanel
-              initialLinkedinUrl={currentStudent.linkedin_profile_url}
-              achievements={externalAchievements}
-              isSyncing={isSyncingLinkedin}
-              onSyncLinkedin={handleSyncLinkedin}
-            />
+            <div id="section-avatar" className="scroll-mt-6">
+              <AvatarCard
+                studentProfile={currentStudent}
+                onGainExperience={handleGainExperience}
+                isUpdatingXp={isUpdatingXp}
+                lastEvolutionMessage={lastEvolutionMessage}
+              />
+            </div>
+            <div id="section-integrations" className="scroll-mt-6 space-y-6">
+              <GithubSyncPanel
+                initialGithubUsername={currentStudent.github_username}
+                achievements={externalAchievements}
+                isSyncing={isSyncingGithub}
+                onSyncGithub={handleSyncGithub}
+              />
+              <LinkedinSyncPanel
+                initialLinkedinUrl={currentStudent.linkedin_profile_url}
+                achievements={externalAchievements}
+                isSyncing={isSyncingLinkedin}
+                onSyncLinkedin={handleSyncLinkedin}
+              />
+            </div>
           </>
         ) : (
-          <AuthenticationPanel
-            apiBaseUrl={API_BASE_URL}
-            onAuthenticated={handleAuthenticated}
-          />
+          <div id="section-avatar" className="scroll-mt-6">
+            <AuthenticationPanel
+              apiBaseUrl={API_BASE_URL}
+              onAuthenticated={handleAuthenticated}
+            />
+          </div>
         )}
 
         {(studentLeaderboard.length > 0 || schoolLeaderboard.length > 0) && (
-          <LeaderboardPanel
-            studentEntries={studentLeaderboard}
-            schoolEntries={schoolLeaderboard}
-            currentUsername={currentStudent?.username}
-          />
+          <div id="section-classements" className="scroll-mt-6">
+            <LeaderboardPanel
+              studentEntries={studentLeaderboard}
+              schoolEntries={schoolLeaderboard}
+              currentUsername={currentStudent?.username}
+            />
+          </div>
         )}
 
         {quests.length > 0 && (
-          <QuestLogPanel
-            quests={quests}
-            isAuthenticated={Boolean(currentStudent)}
-            activeQuestId={activeQuestId}
-            onStartQuest={handleStartQuest}
-            onCompleteQuest={handleCompleteQuest}
-          />
+          <div id="section-quetes" className="scroll-mt-6">
+            <QuestLogPanel
+              quests={quests}
+              isAuthenticated={Boolean(currentStudent)}
+              activeQuestId={activeQuestId}
+              onStartQuest={handleStartQuest}
+              onCompleteQuest={handleCompleteQuest}
+            />
+          </div>
         )}
 
         {skillNodes.length > 0 && (
-          <SkillTreeBoard
-            skills={skillNodes}
-            isAuthenticated={Boolean(currentStudent)}
-            unlockingSkillId={unlockingSkillId}
-            onUnlockSkill={handleUnlockSkill}
-          />
+          <div id="section-competences" className="scroll-mt-6">
+            <SkillTreeBoard
+              skills={skillNodes}
+              isAuthenticated={Boolean(currentStudent)}
+              unlockingSkillId={unlockingSkillId}
+              onUnlockSkill={handleUnlockSkill}
+            />
+          </div>
         )}
 
         {progressionLadder && (
