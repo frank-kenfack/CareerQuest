@@ -1,5 +1,6 @@
 from unittest.mock import patch
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -7,6 +8,7 @@ from rest_framework.test import APIClient
 from progression.models import (
     Avatar,
     Quest,
+    School,
     SkillNode,
     StudentProfile,
     ensure_default_quests,
@@ -510,3 +512,24 @@ class LeaderboardEndpointsTest(TestCase):
         self.assertEqual(schools[1]["rank"], 2)
         self.assertEqual(schools[1]["school_name"], "IMT Atlantique")
         self.assertEqual(schools[1]["total_experience_points"], 250)
+
+
+class SeedDemoCommandTest(TestCase):
+    def test_seed_demo_command_is_idempotent_and_populates_all_entities(self):
+        call_command("seed_demo")
+        first_schools_count = School.objects.count()
+        first_students_count = StudentProfile.objects.count()
+        first_skills_count = SkillNode.objects.count()
+        first_quests_count = Quest.objects.count()
+
+        self.assertGreaterEqual(first_schools_count, 4)
+        self.assertGreaterEqual(first_students_count, 5)
+        self.assertEqual(first_skills_count, 8)
+        self.assertEqual(first_quests_count, 6)
+
+        call_command("seed_demo")
+        self.assertEqual(School.objects.count(), first_schools_count)
+        self.assertEqual(StudentProfile.objects.count(), first_students_count)
+        self.assertEqual(SkillNode.objects.count(), first_skills_count)
+        self.assertEqual(Quest.objects.count(), first_quests_count)
+
