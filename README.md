@@ -1,8 +1,8 @@
 # CareerQuest
 
-CareerQuest est une plateforme web de développement professionnel inspirée des jeux de rôle. Chaque compétence acquise, quête validée (projet, formation, certification) ou réalisation synchronisée depuis GitHub et LinkedIn fait progresser l'avatar de l'utilisateur et alimente un classement entre étudiants et écoles.
+CareerQuest est une plateforme web de développement professionnel inspirée des jeux de rôle. Chaque compétence débloquée dans l'arbre technique, chaque quête validée avec preuve (projet, formation ou certification) et chaque réalisation synchronisée depuis GitHub ou LinkedIn attribue de l'expérience à l'avatar évolutif de l'étudiant et met à jour les classements entre étudiants et écoles.
 
-L'application repose sur une architecture conteneurisée comprenant une interface React, une API REST Python Django et une base de données PostgreSQL.
+L'application repose sur trois conteneurs isolés : une interface React servie par Nginx en reverse proxy, une API REST Python Django exécutée par Gunicorn et une base de données PostgreSQL 16 dotée d'un volume persistant.
 
 ## Installation
 
@@ -21,16 +21,22 @@ cp .env.example .env
 
 ## Lancement
 
-Pour démarrer l'ensemble des services avec Docker Compose :
+Pour démarrer les trois conteneurs en arrière-plan avec Docker Compose (les migrations PostgreSQL et le jeu de démonstration `seed_demo` s'exécutent automatiquement au démarrage) :
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-Une fois les conteneurs démarrés, l'interface web est accessible sur `http://localhost:3000` et l'API Django répond sur `http://localhost:8000/api`.
+Une fois les conteneurs actifs, l'interface web répond sur `http://localhost:3000` et l'API Django est accessible sur `http://localhost:8000/api/health/`.
 
-Pour déployer l'application sur un cluster Kubernetes :
+Pour exécuter la suite complète de tests automatisés et le contrôle de persistance PostgreSQL :
 
 ```bash
-kubectl apply -f k8s/
+python scripts/run_ci_checks.py
+```
+
+Pour déployer les onze manifestes sur un cluster Kubernetes :
+
+```bash
+sh scripts/deploy-k8s.sh
 ```
