@@ -13,6 +13,7 @@ from progression.views import (
     register_student,
     start_quest,
     sync_github_achievements,
+    sync_linkedin_achievements,
     unlock_skill_node,
 )
 
@@ -32,4 +33,5 @@ urlpatterns = [
     path("quests/<int:quest_id>/complete/", complete_quest, name="quest-complete"),
     path("integrations/achievements/", list_external_achievements, name="external-achievement-list"),
     path("integrations/github/sync/", sync_github_achievements, name="github-sync"),
+    path("integrations/linkedin/sync/", sync_linkedin_achievements, name="linkedin-sync"),
 ]

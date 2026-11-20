@@ -219,3 +219,9 @@ class ExternalAchievementSerializer(serializers.ModelSerializer):
 
 class GithubSyncInputSerializer(serializers.Serializer):
     github_username = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+
+
+class LinkedinSyncInputSerializer(serializers.Serializer):
+    linkedin_profile_url = serializers.URLField(max_length=255, required=False, allow_blank=True, default="")
+    certification_title = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    certification_issuer = serializers.CharField(max_length=80, required=False, allow_blank=True, default="")

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import AuthenticationPanel from "./components/AuthenticationPanel";
 import AvatarCard from "./components/AvatarCard";
 import GithubSyncPanel from "./components/GithubSyncPanel";
+import LinkedinSyncPanel from "./components/LinkedinSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
 import {
@@ -32,6 +33,7 @@ export default function App() {
   const [unlockingSkillId, setUnlockingSkillId] = useState<number | null>(null);
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null);
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
+  const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [lastEvolutionMessage, setLastEvolutionMessage] = useState<string | null>(null);
 
   const loadSkillTree = useCallback(async (token: string | null) => {
@@ -387,6 +389,59 @@ export default function App() {
     }
   };
 
+  const handleSyncLinkedin = async (
+    linkedinProfileUrl: string,
+    certificationTitle: string,
+    certificationIssuer: string
+  ) => {
+    if (!accessToken || !currentStudent) {
+      return;
+    }
+    setIsSyncingLinkedin(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/integrations/linkedin/sync/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          linkedin_profile_url: linkedinProfileUrl,
+          certification_title: certificationTitle,
+          certification_issuer: certificationIssuer,
+        }),
+      });
+      const responseBody = await response.json();
+      if (!response.ok) {
+        setLastEvolutionMessage(
+          responseBody.detail || "Impossible d'importer les données LinkedIn."
+        );
+        return;
+      }
+
+      const syncPayload = responseBody as {
+        linkedin_profile_url: string;
+        newly_awarded_xp: number;
+        all_achievements: ExternalAchievementItem[];
+        avatar: AvatarState;
+      };
+
+      setCurrentStudent({
+        ...currentStudent,
+        linkedin_profile_url: syncPayload.linkedin_profile_url,
+        avatar: syncPayload.avatar,
+      });
+      setExternalAchievements(syncPayload.all_achievements);
+      await loadSkillTree(accessToken);
+
+      setLastEvolutionMessage(
+        `Import LinkedIn terminé (+${syncPayload.newly_awarded_xp} XP) : Avatar niveau ${syncPayload.avatar.level} (${syncPayload.avatar.title}) !`
+      );
+    } finally {
+      setIsSyncingLinkedin(false);
+    }
+  };
+
   const formatHealthBadge = (healthPayload: HealthStatusPayload) => {
     if (healthPayload.database_engine) {
       return `API active (${healthPayload.database} : ${healthPayload.database_engine})`;
@@ -443,7 +498,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 3.3 active (Synchronisation GitHub API & Achievements)
+              Étape 3.4 active (Intégrations GitHub & Certifications LinkedIn)
             </span>
           </div>
         </section>
@@ -461,6 +516,12 @@ export default function App() {
               achievements={externalAchievements}
               isSyncing={isSyncingGithub}
               onSyncGithub={handleSyncGithub}
+            />
+            <LinkedinSyncPanel
+              initialLinkedinUrl={currentStudent.linkedin_profile_url}
+              achievements={externalAchievements}
+              isSyncing={isSyncingLinkedin}
+              onSyncLinkedin={handleSyncLinkedin}
             />
           </>
         ) : (
