@@ -4,10 +4,11 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import AvatarCard from "./components/AvatarCard";
+import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
-import { SkillNodeItem, StudentProfile } from "./types/careerquest";
+import { QuestItem, SkillNodeItem, StudentProfile } from "./types/careerquest";
 
-describe("App, AvatarCard and SkillTreeBoard components", () => {
+describe("App, AvatarCard, SkillTreeBoard and QuestLogPanel components", () => {
   afterEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
@@ -30,7 +31,7 @@ describe("App, AvatarCard and SkillTreeBoard components", () => {
         } as Response;
       }
 
-      if (requestUrl.includes("/skills/")) {
+      if (requestUrl.includes("/skills/") || requestUrl.includes("/quests/")) {
         return {
           ok: true,
           status: 200,
@@ -175,5 +176,72 @@ describe("App, AvatarCard and SkillTreeBoard components", () => {
     fireEvent.click(screen.getByTestId("filter-branch-devops"));
     expect(screen.getByTestId("skill-branch-devops")).toBeInTheDocument();
     expect(screen.queryByTestId("skill-branch-cloud")).not.toBeInTheDocument();
+  });
+
+  it("renders QuestLogPanel, filters by quest category and submits proof URL on completion", () => {
+    const startQuestCallback = vi.fn();
+    const completeQuestCallback = vi.fn();
+    const sampleQuests: QuestItem[] = [
+      {
+        id: 21,
+        code: "quest-docker-stack",
+        title: "Deployer une architecture 3 conteneurs Docker",
+        quest_type: "project",
+        description: "Orchestrer PostgreSQL, Django et Nginx/React.",
+        xp_reward: 150,
+        related_skill_id: 10,
+        related_skill_code: "docker-containers",
+        related_skill_name: "Conteneurisation Docker Multi-Services",
+        student_status: "not_started",
+        proof_url: "",
+        completed_at: null,
+      },
+      {
+        id: 22,
+        code: "quest-cka-kubernetes",
+        title: "Certification Cloud Native Kubernetes (CKA)",
+        quest_type: "certification",
+        description: "Valider le deploiement d'un cluster Kubernetes.",
+        xp_reward: 250,
+        related_skill_id: 12,
+        related_skill_code: "kubernetes-cluster",
+        related_skill_name: "Orchestration Kubernetes, Ingress & PVC",
+        student_status: "completed",
+        proof_url: "https://github.com/frank-kenfack/CareerQuest",
+        completed_at: "2026-11-20T18:00:00Z",
+      },
+    ];
+
+    render(
+      <QuestLogPanel
+        quests={sampleQuests}
+        isAuthenticated={true}
+        activeQuestId={null}
+        onStartQuest={startQuestCallback}
+        onCompleteQuest={completeQuestCallback}
+      />
+    );
+
+    expect(screen.getByTestId("quest-completion-counter")).toHaveTextContent(
+      "1 / 2 quêtes accomplies (50%)"
+    );
+    expect(screen.getByTestId("quest-status-quest-docker-stack")).toHaveTextContent("À DÉMARRER");
+    expect(screen.getByTestId("quest-status-quest-cka-kubernetes")).toHaveTextContent("VALIDÉE");
+
+    fireEvent.click(screen.getByTestId("start-quest-quest-docker-stack"));
+    expect(startQuestCallback).toHaveBeenCalledWith(21);
+
+    fireEvent.change(screen.getByTestId("proof-input-quest-docker-stack"), {
+      target: { value: "https://github.com/frank-kenfack/CareerQuest/pull/1" },
+    });
+    fireEvent.click(screen.getByTestId("complete-quest-quest-docker-stack"));
+    expect(completeQuestCallback).toHaveBeenCalledWith(
+      21,
+      "https://github.com/frank-kenfack/CareerQuest/pull/1"
+    );
+
+    fireEvent.click(screen.getByTestId("filter-quest-certification"));
+    expect(screen.getByTestId("quest-card-quest-cka-kubernetes")).toBeInTheDocument();
+    expect(screen.queryByTestId("quest-card-quest-docker-stack")).not.toBeInTheDocument();
   });
 });
