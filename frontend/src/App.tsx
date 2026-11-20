@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import AuthenticationPanel from "./components/AuthenticationPanel";
 import AvatarCard from "./components/AvatarCard";
 import GithubSyncPanel from "./components/GithubSyncPanel";
+import LeaderboardPanel from "./components/LeaderboardPanel";
 import LinkedinSyncPanel from "./components/LinkedinSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
@@ -11,7 +12,9 @@ import {
   HealthStatusPayload,
   ProgressionTiersPayload,
   QuestItem,
+  SchoolLeaderboardEntry,
   SkillNodeItem,
+  StudentLeaderboardEntry,
   StudentProfile,
 } from "./types/careerquest";
 
@@ -24,6 +27,8 @@ export default function App() {
   const [skillNodes, setSkillNodes] = useState<SkillNodeItem[]>([]);
   const [quests, setQuests] = useState<QuestItem[]>([]);
   const [externalAchievements, setExternalAchievements] = useState<ExternalAchievementItem[]>([]);
+  const [studentLeaderboard, setStudentLeaderboard] = useState<StudentLeaderboardEntry[]>([]);
+  const [schoolLeaderboard, setSchoolLeaderboard] = useState<SchoolLeaderboardEntry[]>([]);
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
@@ -35,6 +40,29 @@ export default function App() {
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
   const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [lastEvolutionMessage, setLastEvolutionMessage] = useState<string | null>(null);
+
+  const loadLeaderboards = useCallback(async () => {
+    try {
+      const [studentsResponse, schoolsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/leaderboard/students/`),
+        fetch(`${API_BASE_URL}/leaderboard/schools/`),
+      ]);
+      if (studentsResponse.ok) {
+        const studentsPayload = (await studentsResponse.json()) as StudentLeaderboardEntry[];
+        if (Array.isArray(studentsPayload)) {
+          setStudentLeaderboard(studentsPayload);
+        }
+      }
+      if (schoolsResponse.ok) {
+        const schoolsPayload = (await schoolsResponse.json()) as SchoolLeaderboardEntry[];
+        if (Array.isArray(schoolsPayload)) {
+          setSchoolLeaderboard(schoolsPayload);
+        }
+      }
+    } catch {
+      // Les classements sont ignores lors des tests unitaires isoles.
+    }
+  }, []);
 
   const loadSkillTree = useCallback(async (token: string | null) => {
     try {
@@ -137,7 +165,14 @@ export default function App() {
     loadSkillTree(accessToken);
     loadQuestsCatalog(accessToken);
     loadExternalAchievements(accessToken);
-  }, [accessToken, loadSkillTree, loadQuestsCatalog, loadExternalAchievements]);
+    loadLeaderboards();
+  }, [
+    accessToken,
+    loadSkillTree,
+    loadQuestsCatalog,
+    loadExternalAchievements,
+    loadLeaderboards,
+  ]);
 
   useEffect(() => {
     if (!accessToken || currentStudent) {
@@ -175,6 +210,7 @@ export default function App() {
     localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
     setAccessToken(token);
     setCurrentStudent(studentProfile);
+    loadLeaderboards();
     setLastEvolutionMessage(
       `Session ouverte pour ${studentProfile.username} (Avatar niveau ${studentProfile.avatar.level} : ${studentProfile.avatar.title}).`
     );
@@ -220,6 +256,7 @@ export default function App() {
         avatar: awardPayload.avatar,
       });
       await loadSkillTree(accessToken);
+      await loadLeaderboards();
       if (awardPayload.progression.tier_evolved) {
         setLastEvolutionMessage(
           `Évolution de palier atteinte : Niveau ${awardPayload.progression.new_level} (${awardPayload.progression.title}) !`
@@ -269,6 +306,7 @@ export default function App() {
         avatar: unlockedPayload.avatar,
       });
       await loadSkillTree(accessToken);
+      await loadLeaderboards();
 
       setLastEvolutionMessage(
         `Compétence « ${unlockedPayload.unlocked_skill.name} » débloquée (+${unlockedPayload.unlocked_skill.xp_reward} XP) : Avatar niveau ${unlockedPayload.avatar.level} (${unlockedPayload.avatar.title}) !`
@@ -334,6 +372,7 @@ export default function App() {
       });
       await loadQuestsCatalog(accessToken);
       await loadSkillTree(accessToken);
+      await loadLeaderboards();
 
       setLastEvolutionMessage(
         `Quête « ${completedPayload.quest.title} » validée (+${completedPayload.quest.xp_reward} XP) : Avatar niveau ${completedPayload.avatar.level} (${completedPayload.avatar.title}) !`
@@ -380,6 +419,7 @@ export default function App() {
       });
       setExternalAchievements(syncPayload.all_achievements);
       await loadSkillTree(accessToken);
+      await loadLeaderboards();
 
       setLastEvolutionMessage(
         `Synchronisation GitHub @${syncPayload.github_username} terminée (${syncPayload.repositories_analyzed_count} dépôts analysés, +${syncPayload.newly_awarded_xp} XP) : Avatar niveau ${syncPayload.avatar.level} !`
@@ -433,6 +473,7 @@ export default function App() {
       });
       setExternalAchievements(syncPayload.all_achievements);
       await loadSkillTree(accessToken);
+      await loadLeaderboards();
 
       setLastEvolutionMessage(
         `Import LinkedIn terminé (+${syncPayload.newly_awarded_xp} XP) : Avatar niveau ${syncPayload.avatar.level} (${syncPayload.avatar.title}) !`
@@ -498,7 +539,7 @@ export default function App() {
               </p>
             </div>
             <span className="rounded-md border border-indigo-500/40 bg-indigo-950/50 px-3 py-1 text-xs font-medium text-indigo-300">
-              Étape 3.4 active (Intégrations GitHub & Certifications LinkedIn)
+              Jour 3 validé (5 Fonctionnalités Core : Avatar, Quêtes, Arbre, GitHub/LinkedIn & Classements)
             </span>
           </div>
         </section>
@@ -528,6 +569,14 @@ export default function App() {
           <AuthenticationPanel
             apiBaseUrl={API_BASE_URL}
             onAuthenticated={handleAuthenticated}
+          />
+        )}
+
+        {(studentLeaderboard.length > 0 || schoolLeaderboard.length > 0) && (
+          <LeaderboardPanel
+            studentEntries={studentLeaderboard}
+            schoolEntries={schoolLeaderboard}
+            currentUsername={currentStudent?.username}
           />
         )}
 

@@ -5,17 +5,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import AvatarCard from "./components/AvatarCard";
 import GithubSyncPanel from "./components/GithubSyncPanel";
+import LeaderboardPanel from "./components/LeaderboardPanel";
 import LinkedinSyncPanel from "./components/LinkedinSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
 import SkillTreeBoard from "./components/SkillTreeBoard";
 import {
   ExternalAchievementItem,
   QuestItem,
+  SchoolLeaderboardEntry,
   SkillNodeItem,
+  StudentLeaderboardEntry,
   StudentProfile,
 } from "./types/careerquest";
 
-describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel, GithubSyncPanel and LinkedinSyncPanel components", () => {
+describe("CareerQuest UI Components", () => {
   afterEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
@@ -41,7 +44,8 @@ describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel, GithubSyncPanel and Li
       if (
         requestUrl.includes("/skills/") ||
         requestUrl.includes("/quests/") ||
-        requestUrl.includes("/integrations/achievements/")
+        requestUrl.includes("/integrations/achievements/") ||
+        requestUrl.includes("/leaderboard/")
       ) {
         return {
           ok: true,
@@ -323,6 +327,79 @@ describe("App, AvatarCard, SkillTreeBoard, QuestLogPanel, GithubSyncPanel and Li
       "https://www.linkedin.com/in/frank-kenfack",
       "Kubernetes & Cloud Native DevOps",
       "Linux Foundation"
+    );
+  });
+
+  it("renders LeaderboardPanel student and school rankings and switches tabs", () => {
+    const studentEntries: StudentLeaderboardEntry[] = [
+      {
+        rank: 1,
+        student_id: 1,
+        username: "frank_devops",
+        school_name: "Epitech Digital",
+        school_city: "Paris",
+        level: 15,
+        experience_points: 1495,
+        title: "Maitre Architecte Fullstack",
+        visual_tier: "maitre",
+        unlocked_skills_count: 2,
+        completed_quests_count: 1,
+      },
+      {
+        rank: 2,
+        student_id: 2,
+        username: "lina_cloud",
+        school_name: "IMT Atlantique",
+        school_city: "Nantes",
+        level: 6,
+        experience_points: 520,
+        title: "Ingenieur Cloud Confirme",
+        visual_tier: "confirme",
+        unlocked_skills_count: 3,
+        completed_quests_count: 2,
+      },
+    ];
+
+    const schoolEntries: SchoolLeaderboardEntry[] = [
+      {
+        rank: 1,
+        school_id: 1,
+        school_name: "Epitech Digital",
+        city: "Paris",
+        students_count: 1,
+        total_experience_points: 1495,
+        average_level: 15,
+        top_student_username: "frank_devops",
+      },
+      {
+        rank: 2,
+        school_id: 2,
+        school_name: "IMT Atlantique",
+        city: "Nantes",
+        students_count: 1,
+        total_experience_points: 520,
+        average_level: 6,
+        top_student_username: "lina_cloud",
+      },
+    ];
+
+    render(
+      <LeaderboardPanel
+        studentEntries={studentEntries}
+        schoolEntries={schoolEntries}
+        currentUsername="frank_devops"
+      />
+    );
+
+    expect(screen.getByTestId("leaderboard-student-frank_devops")).toBeInTheDocument();
+    expect(screen.getByTestId("leaderboard-xp-frank_devops")).toHaveTextContent("1495 XP");
+
+    fireEvent.click(screen.getByTestId("tab-leaderboard-schools"));
+    expect(screen.getByTestId("leaderboard-school-Epitech Digital")).toHaveTextContent(
+      "1495 XP cumulés"
+    );
+    expect(screen.getByTestId("leaderboard-school-IMT Atlantique")).toHaveTextContent(
+      "520 XP cumulés"
     );
   });
 });

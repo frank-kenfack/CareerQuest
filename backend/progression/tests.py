@@ -450,3 +450,63 @@ class LinkedinIntegrationSyncTest(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("linkedin.com/in/", response.json()["detail"])
+
+
+class LeaderboardEndpointsTest(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+
+        first_register = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "alice_epitech",
+                "email": "alice@epitech.fr",
+                "password": "StrongPassword2026!",
+                "school_name": "Epitech Digital",
+                "school_city": "Paris",
+            },
+            format="json",
+        )
+        first_token = first_register.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {first_token}")
+        self.api_client.post(reverse("avatar-award-xp"), {"earned_xp": 500}, format="json")
+
+        second_register = self.api_client.post(
+            reverse("auth-register"),
+            {
+                "username": "bob_imt",
+                "email": "bob@imt.fr",
+                "password": "StrongPassword2026!",
+                "school_name": "IMT Atlantique",
+                "school_city": "Nantes",
+            },
+            format="json",
+        )
+        second_token = second_register.json()["tokens"]["access"]
+        self.api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {second_token}")
+        self.api_client.post(reverse("avatar-award-xp"), {"earned_xp": 250}, format="json")
+
+    def test_student_leaderboard_orders_students_by_experience_descending(self):
+        response = self.api_client.get(reverse("leaderboard-students"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        entries = response.json()
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]["rank"], 1)
+        self.assertEqual(entries[0]["username"], "alice_epitech")
+        self.assertEqual(entries[0]["experience_points"], 500)
+        self.assertEqual(entries[1]["rank"], 2)
+        self.assertEqual(entries[1]["username"], "bob_imt")
+        self.assertEqual(entries[1]["experience_points"], 250)
+
+    def test_school_leaderboard_aggregates_total_xp_and_ranks_schools(self):
+        response = self.api_client.get(reverse("leaderboard-schools"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        schools = response.json()
+        self.assertEqual(len(schools), 2)
+        self.assertEqual(schools[0]["rank"], 1)
+        self.assertEqual(schools[0]["school_name"], "Epitech Digital")
+        self.assertEqual(schools[0]["total_experience_points"], 500)
+        self.assertEqual(schools[0]["top_student_username"], "alice_epitech")
+        self.assertEqual(schools[1]["rank"], 2)
+        self.assertEqual(schools[1]["school_name"], "IMT Atlantique")
+        self.assertEqual(schools[1]["total_experience_points"], 250)

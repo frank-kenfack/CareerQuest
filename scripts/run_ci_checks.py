@@ -21,6 +21,9 @@ def verify_live_endpoints():
         "http://localhost:8000/api/health/",
         "http://localhost:8000/api/avatar/progression-tiers/",
         "http://localhost:8000/api/skills/",
+        "http://localhost:8000/api/quests/",
+        "http://localhost:8000/api/leaderboard/students/",
+        "http://localhost:8000/api/leaderboard/schools/",
     ):
         with urllib.request.urlopen(endpoint_url, timeout=10) as response:
             if response.status != 200:
