@@ -1,6 +1,7 @@
 from django.db import connections, transaction
 from django.db.utils import OperationalError
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -9,15 +10,20 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from progression.models import (
     AVATAR_PROGRESSION_TIERS,
     Avatar,
+    Quest,
+    QuestCompletion,
     School,
     SkillNode,
     StudentProfile,
     UnlockedSkill,
+    ensure_default_quests,
     ensure_default_skill_tree,
 )
 from progression.serializers import (
     AvatarSerializer,
     AwardExperienceSerializer,
+    QuestCompletionInputSerializer,
+    QuestSerializer,
     SchoolSerializer,
     SkillNodeSerializer,
     StudentProfileSerializer,
@@ -220,6 +226,115 @@ def unlock_skill_node(request, skill_id):
     return Response(
         {
             "unlocked_skill": serialized_skill,
+            "progression": progression_summary,
+            "avatar": AvatarSerializer(student_avatar).data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def list_quests(request):
+    ensure_default_quests()
+    quests_queryset = Quest.objects.select_related("related_skill").all()
+
+    requested_type = request.query_params.get("quest_type", "").strip()
+    if requested_type in ("project", "training", "certification"):
+        quests_queryset = quests_queryset.filter(quest_type=requested_type)
+
+    completions_by_quest_id = {}
+    if request.user and request.user.is_authenticated:
+        student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+        completions_by_quest_id = {
+            record.quest_id: record
+            for record in QuestCompletion.objects.filter(student=student_profile)
+        }
+
+    serializer = QuestSerializer(
+        quests_queryset,
+        many=True,
+        context={"completions_by_quest_id": completions_by_quest_id},
+    )
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def start_quest(request, quest_id):
+    ensure_default_quests()
+    target_quest = get_object_or_404(Quest.objects.select_related("related_skill"), pk=quest_id)
+    student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    Avatar.objects.get_or_create(student=student_profile)
+
+    existing_completion = QuestCompletion.objects.filter(
+        student=student_profile,
+        quest=target_quest,
+    ).first()
+
+    if existing_completion and existing_completion.status == "completed":
+        return Response(
+            {"detail": "Cette quete est deja validee."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    completion_record, _ = QuestCompletion.objects.get_or_create(
+        student=student_profile,
+        quest=target_quest,
+        defaults={"status": "in_progress"},
+    )
+
+    serialized_quest = QuestSerializer(
+        target_quest,
+        context={"completions_by_quest_id": {target_quest.id: completion_record}},
+    ).data
+    return Response({"quest": serialized_quest}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def complete_quest(request, quest_id):
+    ensure_default_quests()
+    target_quest = get_object_or_404(Quest.objects.select_related("related_skill"), pk=quest_id)
+    input_serializer = QuestCompletionInputSerializer(data=request.data)
+    input_serializer.is_valid(raise_exception=True)
+
+    student_profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    student_avatar, _ = Avatar.objects.get_or_create(student=student_profile)
+
+    existing_completion = QuestCompletion.objects.filter(
+        student=student_profile,
+        quest=target_quest,
+    ).first()
+
+    if existing_completion and existing_completion.status == "completed":
+        return Response(
+            {"detail": "Cette quete a deja ete validee et recompensee."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    proof_url = input_serializer.validated_data.get("proof_url", "").strip()
+
+    with transaction.atomic():
+        completion_record, _ = QuestCompletion.objects.update_or_create(
+            student=student_profile,
+            quest=target_quest,
+            defaults={
+                "status": "completed",
+                "proof_url": proof_url,
+                "completed_at": timezone.now(),
+            },
+        )
+        progression_summary = student_avatar.award_experience(target_quest.xp_reward)
+
+    serialized_quest = QuestSerializer(
+        target_quest,
+        context={"completions_by_quest_id": {target_quest.id: completion_record}},
+    ).data
+
+    return Response(
+        {
+            "quest": serialized_quest,
             "progression": progression_summary,
             "avatar": AvatarSerializer(student_avatar).data,
         },
