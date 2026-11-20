@@ -44,6 +44,13 @@ class CiCdPipelineConfigurationTest(unittest.TestCase):
         self.assertIn("makemigrations --check --dry-run", github_workflow_content)
         self.assertTrue(CI_RUNNER_SCRIPT_PATH.exists())
 
+    def test_release_ci_runner_verifies_three_containers_and_persistence(self):
+        runner_script_content = CI_RUNNER_SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn("http://localhost:8000/api/health/", runner_script_content)
+        self.assertIn("http://localhost:3000/api/health/", runner_script_content)
+        self.assertIn("verify_database_persistence_across_restart", runner_script_content)
+        self.assertIn('["docker", "compose", "restart", "db", "backend"]', runner_script_content)
+
 
 if __name__ == "__main__":
     unittest.main()
