@@ -485,9 +485,9 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/40 bg-indigo-950/70 text-indigo-300 shadow-inner">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-500/40 bg-indigo-950/70 text-indigo-300 shadow-inner">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -509,11 +509,11 @@ export default function App() {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-white">
+              <h1 className="text-base font-bold tracking-tight text-white">
                 CareerQuest
               </h1>
-              <p className="text-xs text-slate-400">
-                Développement professionnel & parcours de compétences
+              <p className="hidden text-[11px] text-slate-400 xl:block">
+                Développement professionnel & compétences
               </p>
             </div>
           </div>
