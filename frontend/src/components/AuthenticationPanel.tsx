@@ -92,33 +92,18 @@ export default function AuthenticationPanel({
   return (
     <section
       data-testid="auth-panel"
-      className="rounded-xl border border-slate-800 bg-slate-900 p-6"
+      className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-6 shadow-xl shadow-slate-950/60"
     >
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h3 className="text-base font-semibold text-white">
-            Portail Joueur CareerQuest (JWT)
+          <h3 className="text-lg font-semibold text-white">
+            Espace étudiant
           </h3>
-          <p className="text-xs text-slate-400">
-            Créez un profil étudiant pour générer votre avatar niveau 1 ou connectez-vous à votre session.
+          <p className="mt-0.5 text-xs text-slate-400">
+            Accédez à votre tableau de bord ou créez votre profil de progression.
           </p>
         </div>
         <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
-          <button
-            type="button"
-            data-testid="tab-register"
-            onClick={() => {
-              setAuthMode("register");
-              setErrorMessage(null);
-            }}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-              authMode === "register"
-                ? "bg-indigo-600 text-white"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Inscription
-          </button>
           <button
             type="button"
             data-testid="tab-login"
@@ -126,13 +111,28 @@ export default function AuthenticationPanel({
               setAuthMode("login");
               setErrorMessage(null);
             }}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+            className={`rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors ${
               authMode === "login"
-                ? "bg-indigo-600 text-white"
+                ? "bg-indigo-600 text-white shadow-sm"
                 : "text-slate-400 hover:text-white"
             }`}
           >
             Connexion
+          </button>
+          <button
+            type="button"
+            data-testid="tab-register"
+            onClick={() => {
+              setAuthMode("register");
+              setErrorMessage(null);
+            }}
+            className={`rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              authMode === "register"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Inscription
           </button>
         </div>
       </div>

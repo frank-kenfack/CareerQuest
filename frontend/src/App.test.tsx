@@ -78,15 +78,11 @@ describe("CareerQuest UI Components", () => {
     expect(screen.getByTestId("auth-submit-button")).toHaveTextContent("Se connecter");
 
     await waitFor(() => {
-      expect(screen.getByTestId("backend-status")).toHaveTextContent(
-        "API active (connected)"
-      );
       expect(screen.getByText("Apprenti DevOps")).toBeInTheDocument();
-      expect(screen.getByTestId("kubernetes-architecture-panel")).toBeInTheDocument();
       expect(screen.getByTestId("section-navigation")).toBeInTheDocument();
-      expect(screen.getByTestId("persistence-indicator")).toHaveTextContent(
-        "Persistance PostgreSQL 16"
-      );
+      expect(
+        screen.getByText("Paliers d'évolution de carrière")
+      ).toBeInTheDocument();
     });
   });
 

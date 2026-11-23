@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import AuthenticationPanel from "./components/AuthenticationPanel";
 import AvatarCard from "./components/AvatarCard";
 import GithubSyncPanel from "./components/GithubSyncPanel";
-import KubernetesArchitecturePanel from "./components/KubernetesArchitecturePanel";
 import LeaderboardPanel from "./components/LeaderboardPanel";
 import LinkedinSyncPanel from "./components/LinkedinSyncPanel";
 import QuestLogPanel from "./components/QuestLogPanel";
@@ -22,8 +21,14 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const ACCESS_TOKEN_STORAGE_KEY = "careerquest_access_token";
 
+type ActiveWorkspaceSection =
+  | "overview"
+  | "skills"
+  | "quests"
+  | "integrations"
+  | "leaderboards";
+
 export default function App() {
-  const [backendHealth, setBackendHealth] = useState<HealthStatusPayload | null>(null);
   const [progressionLadder, setProgressionLadder] = useState<ProgressionTiersPayload | null>(null);
   const [skillNodes, setSkillNodes] = useState<SkillNodeItem[]>([]);
   const [quests, setQuests] = useState<QuestItem[]>([]);
@@ -35,12 +40,12 @@ export default function App() {
     localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
   );
   const [currentStudent, setCurrentStudent] = useState<StudentProfile | null>(null);
-  const [isUpdatingXp, setIsUpdatingXp] = useState(false);
   const [unlockingSkillId, setUnlockingSkillId] = useState<number | null>(null);
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null);
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
   const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [lastEvolutionMessage, setLastEvolutionMessage] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<ActiveWorkspaceSection>("overview");
 
   const loadLeaderboards = useCallback(async () => {
     try {
@@ -130,9 +135,9 @@ export default function App() {
         }
         return response.json() as Promise<HealthStatusPayload>;
       })
-      .then((healthPayload) => {
+      .then(() => {
         if (isMounted) {
-          setBackendHealth(healthPayload);
+          setConnectionFailed(false);
         }
       })
       .catch(() => {
@@ -154,7 +159,7 @@ export default function App() {
         }
       })
       .catch(() => {
-        // Les paliers sont optionnels lors des tests unitaires isoles du composant d'en-tete.
+        // Les paliers sont optionnels lors des tests unitaires isoles.
       });
 
     return () => {
@@ -213,7 +218,7 @@ export default function App() {
     setCurrentStudent(studentProfile);
     loadLeaderboards();
     setLastEvolutionMessage(
-      `Session ouverte pour ${studentProfile.username} (Avatar niveau ${studentProfile.avatar.level} : ${studentProfile.avatar.title}).`
+      `Bienvenue ${studentProfile.username}. Votre avatar est au niveau ${studentProfile.avatar.level} (${studentProfile.avatar.title}).`
     );
   };
 
@@ -223,53 +228,7 @@ export default function App() {
     setCurrentStudent(null);
     setExternalAchievements([]);
     setLastEvolutionMessage(null);
-  };
-
-  const handleGainExperience = async (xpAmount: number) => {
-    if (!accessToken || !currentStudent) {
-      return;
-    }
-    setIsUpdatingXp(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/avatar/award-xp/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ earned_xp: xpAmount }),
-      });
-      if (!response.ok) {
-        throw new Error("Impossible d'attribuer les points d'expérience.");
-      }
-      const awardPayload = (await response.json()) as {
-        progression: {
-          previous_level: number;
-          new_level: number;
-          leveled_up: boolean;
-          tier_evolved: boolean;
-          title: string;
-        };
-        avatar: AvatarState;
-      };
-      setCurrentStudent({
-        ...currentStudent,
-        avatar: awardPayload.avatar,
-      });
-      await loadSkillTree(accessToken);
-      await loadLeaderboards();
-      if (awardPayload.progression.tier_evolved) {
-        setLastEvolutionMessage(
-          `Évolution de palier atteinte : Niveau ${awardPayload.progression.new_level} (${awardPayload.progression.title}) !`
-        );
-      } else if (awardPayload.progression.leveled_up) {
-        setLastEvolutionMessage(
-          `Passage au niveau ${awardPayload.progression.new_level} (${awardPayload.progression.title}) !`
-        );
-      }
-    } finally {
-      setIsUpdatingXp(false);
-    }
+    setActiveSection("overview");
   };
 
   const handleUnlockSkill = async (skillId: number) => {
@@ -310,7 +269,7 @@ export default function App() {
       await loadLeaderboards();
 
       setLastEvolutionMessage(
-        `Compétence « ${unlockedPayload.unlocked_skill.name} » débloquée (+${unlockedPayload.unlocked_skill.xp_reward} XP) : Avatar niveau ${unlockedPayload.avatar.level} (${unlockedPayload.avatar.title}) !`
+        `Compétence « ${unlockedPayload.unlocked_skill.name} » acquise (+${unlockedPayload.unlocked_skill.xp_reward} XP). Niveau actuel : ${unlockedPayload.avatar.level} (${unlockedPayload.avatar.title}).`
       );
     } finally {
       setUnlockingSkillId(null);
@@ -376,7 +335,7 @@ export default function App() {
       await loadLeaderboards();
 
       setLastEvolutionMessage(
-        `Quête « ${completedPayload.quest.title} » validée (+${completedPayload.quest.xp_reward} XP) : Avatar niveau ${completedPayload.avatar.level} (${completedPayload.avatar.title}) !`
+        `Quête « ${completedPayload.quest.title} » validée (+${completedPayload.quest.xp_reward} XP). Niveau actuel : ${completedPayload.avatar.level} (${completedPayload.avatar.title}).`
       );
     } finally {
       setActiveQuestId(null);
@@ -423,7 +382,7 @@ export default function App() {
       await loadLeaderboards();
 
       setLastEvolutionMessage(
-        `Synchronisation GitHub @${syncPayload.github_username} terminée (${syncPayload.repositories_analyzed_count} dépôts analysés, +${syncPayload.newly_awarded_xp} XP) : Avatar niveau ${syncPayload.avatar.level} !`
+        `Synchronisation GitHub @${syncPayload.github_username} terminée (${syncPayload.repositories_analyzed_count} dépôts analysés, +${syncPayload.newly_awarded_xp} XP).`
       );
     } finally {
       setIsSyncingGithub(false);
@@ -477,180 +436,284 @@ export default function App() {
       await loadLeaderboards();
 
       setLastEvolutionMessage(
-        `Import LinkedIn terminé (+${syncPayload.newly_awarded_xp} XP) : Avatar niveau ${syncPayload.avatar.level} (${syncPayload.avatar.title}) !`
+        `Import LinkedIn enregistré (+${syncPayload.newly_awarded_xp} XP).`
       );
     } finally {
       setIsSyncingLinkedin(false);
     }
   };
 
-  const formatHealthBadge = (healthPayload: HealthStatusPayload) => {
-    if (healthPayload.database_engine) {
-      return `API active (${healthPayload.database} : ${healthPayload.database_engine})`;
-    }
-    return `API active (${healthPayload.database})`;
-  };
+  const unlockedSkillsCount = skillNodes.filter((node) => node.is_unlocked).length;
+  const completedQuestsCount = quests.filter(
+    (quest) => quest.student_status === "completed"
+  ).length;
+  const currentStudentRank =
+    studentLeaderboard.find((entry) => entry.username === currentStudent?.username)
+      ?.rank ?? null;
+
+  const navigationTabs: { id: ActiveWorkspaceSection; label: string; count?: string }[] = [
+    { id: "overview", label: "Vue d'ensemble" },
+    {
+      id: "skills",
+      label: "Compétences",
+      count: skillNodes.length > 0 ? `${unlockedSkillsCount}/${skillNodes.length}` : undefined,
+    },
+    {
+      id: "quests",
+      label: "Quêtes",
+      count: quests.length > 0 ? `${completedQuestsCount}/${quests.length}` : undefined,
+    },
+    {
+      id: "integrations",
+      label: "GitHub & LinkedIn",
+      count:
+        externalAchievements.length > 0
+          ? String(externalAchievements.length)
+          : undefined,
+    },
+    {
+      id: "leaderboards",
+      label: "Classements",
+      count:
+        studentLeaderboard.length > 0 ? String(studentLeaderboard.length) : undefined,
+    },
+  ];
+
+  const isSectionVisible = (sectionKey: ActiveWorkspaceSection) =>
+    activeSection === "overview" || activeSection === sectionKey;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/80 px-6 py-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-indigo-400">
-              CareerQuest
-            </h1>
-            <p className="text-xs text-slate-400">
-              Progression professionnelle et arbre de compétences
-            </p>
-          </div>
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
           <div className="flex items-center gap-3">
-            {currentStudent && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                data-testid="logout-button"
-                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-200 hover:bg-slate-700"
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/40 bg-indigo-950/70 text-indigo-300 shadow-inner">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-5 w-5"
+                aria-hidden="true"
               >
-                Déconnexion ({currentStudent.username})
-              </button>
-            )}
-            <div
-              data-testid="backend-status"
-              className="rounded-full border border-emerald-500/40 bg-emerald-950/50 px-3 py-1 text-xs text-emerald-300"
-            >
-              {backendHealth
-                ? formatHealthBadge(backendHealth)
-                : connectionFailed
-                  ? "API hors ligne"
-                  : "Vérification de l'API..."}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 12l8-4.5M12 12v9M12 12L4 7.5"
+                />
+              </svg>
             </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-white">
+                CareerQuest
+              </h1>
+              <p className="text-xs text-slate-400">
+                Développement professionnel & parcours de compétences
+              </p>
+            </div>
+          </div>
+
+          <nav
+            aria-label="Navigation principale"
+            data-testid="section-navigation"
+            className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-800/90 bg-slate-900/90 p-1"
+          >
+            {navigationTabs.map((tab) => {
+              const isActive = activeSection === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveSection(tab.id)}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
+                        isActive
+                          ? "bg-indigo-800 text-indigo-100"
+                          : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="flex items-center gap-3">
+            {connectionFailed && (
+              <span className="rounded-full border border-rose-500/40 bg-rose-950/60 px-3 py-1 text-xs text-rose-300">
+                Service indisponible
+              </span>
+            )}
+
+            {currentStudent ? (
+              <div className="flex items-center gap-3">
+                <div className="hidden text-right sm:block">
+                  <p className="text-xs font-semibold text-white">
+                    {currentStudent.username}
+                  </p>
+                  <p className="text-[11px] text-indigo-300">
+                    Niv. {currentStudent.avatar.level} ({currentStudent.avatar.experience_points} XP)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  data-testid="logout-button"
+                  className="rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
+                >
+                  Déconnexion
+                </button>
+              </div>
+            ) : (
+              <span className="hidden rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 sm:inline-block">
+                Mode visiteur
+              </span>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10 space-y-6">
-        <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                Tableau de bord du joueur
-              </h2>
-              <p className="mt-1 text-sm text-slate-300">
-                Accomplissez des quêtes, validez des compétences techniques et faites évoluer votre avatar.
-              </p>
-            </div>
-            <span className="rounded-md border border-emerald-500/40 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300">
-              Version 1.0.0 Finale (Jour 5 validé : 5 Fonctionnalités Core, 3 Conteneurs, CI/CD & Bonus Kubernetes +20 %)
-            </span>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
-            <nav
-              aria-label="Navigation rapide des fonctionnalités"
-              data-testid="section-navigation"
-              className="flex flex-wrap items-center gap-2"
-            >
-              <a
-                href="#section-avatar"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
-              >
-                1. Avatar Évolutif
-              </a>
-              <a
-                href="#section-competences"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
-              >
-                2. Arbre de Compétences ({skillNodes.length})
-              </a>
-              <a
-                href="#section-quetes"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
-              >
-                3. Quêtes ({quests.length})
-              </a>
-              <a
-                href="#section-integrations"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
-              >
-                4. GitHub & LinkedIn
-              </a>
-              <a
-                href="#section-classements"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-400 hover:text-indigo-300"
-              >
-                5. Classements ({studentLeaderboard.length} étudiants / {schoolLeaderboard.length} écoles)
-              </a>
-              <a
-                href="#section-kubernetes"
-                className="rounded-lg border border-indigo-500/40 bg-indigo-950/40 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:border-indigo-400"
-              >
-                Bonus Kubernetes (11 manifestes)
-              </a>
-            </nav>
-
-            <div
-              data-testid="persistence-indicator"
-              className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300"
-            >
-              Persistance PostgreSQL 16 :{" "}
-              <span className="font-semibold text-emerald-300">
-                {backendHealth?.registered_students_count ?? studentLeaderboard.length} profils actifs
-              </span>{" "}
-              (Volume Docker & PVC Kubernetes 5Gi)
-            </div>
-          </div>
-        </section>
-
-        <div id="section-kubernetes" className="scroll-mt-6">
-          <KubernetesArchitecturePanel />
-        </div>
-
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 space-y-8">
         {currentStudent ? (
-          <>
-            <div id="section-avatar" className="scroll-mt-6">
-              <AvatarCard
-                studentProfile={currentStudent}
-                onGainExperience={handleGainExperience}
-                isUpdatingXp={isUpdatingXp}
-                lastEvolutionMessage={lastEvolutionMessage}
-              />
+          <div className="space-y-6">
+            <AvatarCard
+              studentProfile={currentStudent}
+              lastEvolutionMessage={lastEvolutionMessage}
+            />
+
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div className="rounded-xl border border-slate-800/90 bg-slate-900/80 p-4">
+                <p className="text-xs text-slate-400">Niveau & titre actuel</p>
+                <p className="mt-1 text-lg font-bold text-white">
+                  Niveau {currentStudent.avatar.level}
+                </p>
+                <p className="mt-0.5 text-xs text-indigo-300">
+                  {currentStudent.avatar.title}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/90 bg-slate-900/80 p-4">
+                <p className="text-xs text-slate-400">Compétences maîtrisées</p>
+                <p className="mt-1 text-lg font-bold text-white">
+                  {unlockedSkillsCount} / {skillNodes.length}
+                </p>
+                <p className="mt-0.5 text-xs text-emerald-300">
+                  4 branches techniques
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/90 bg-slate-900/80 p-4">
+                <p className="text-xs text-slate-400">Quêtes validées</p>
+                <p className="mt-1 text-lg font-bold text-white">
+                  {completedQuestsCount} / {quests.length}
+                </p>
+                <p className="mt-0.5 text-xs text-cyan-300">
+                  Projets, formations & certifications
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/90 bg-slate-900/80 p-4">
+                <p className="text-xs text-slate-400">Classement général</p>
+                <p className="mt-1 text-lg font-bold text-white">
+                  {currentStudentRank ? `#${currentStudentRank}` : "-"}
+                </p>
+                <p className="mt-0.5 text-xs text-amber-300">
+                  Sur {studentLeaderboard.length} étudiants inscrits
+                </p>
+              </div>
             </div>
-            <div id="section-integrations" className="scroll-mt-6 space-y-6">
-              <GithubSyncPanel
-                initialGithubUsername={currentStudent.github_username}
-                achievements={externalAchievements}
-                isSyncing={isSyncingGithub}
-                onSyncGithub={handleSyncGithub}
-              />
-              <LinkedinSyncPanel
-                initialLinkedinUrl={currentStudent.linkedin_profile_url}
-                achievements={externalAchievements}
-                isSyncing={isSyncingLinkedin}
-                onSyncLinkedin={handleSyncLinkedin}
-              />
-            </div>
-          </>
+          </div>
         ) : (
-          <div id="section-avatar" className="scroll-mt-6">
-            <AuthenticationPanel
-              apiBaseUrl={API_BASE_URL}
-              onAuthenticated={handleAuthenticated}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+            <div className="space-y-6 lg:col-span-7">
+              <div className="rounded-2xl border border-slate-800/90 bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900 p-8">
+                <span className="inline-block rounded-full border border-indigo-500/40 bg-indigo-950/80 px-3 py-1 text-xs font-medium text-indigo-300">
+                  Plateforme de progression étudiante
+                </span>
+                <h2 className="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                  Construisez et validez votre parcours technique étape par étape
+                </h2>
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                  Débloquez des compétences en développement, DevOps et Cloud, validez vos projets et certifications avec preuve, synchronisez vos réalisations GitHub et LinkedIn, et représentez votre établissement dans le classement inter-écoles.
+                </p>
+
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+                    <p className="text-xs font-semibold uppercase text-indigo-300">
+                      Arbre technique
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {skillNodes.length || 8} compétences
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Frontend, Backend, DevOps et Cloud avec prérequis.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+                    <p className="text-xs font-semibold uppercase text-emerald-300">
+                      Missions & preuves
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {quests.length || 6} quêtes métiers
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Validation par dépôt Git ou certificat vérifié.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+                    <p className="text-xs font-semibold uppercase text-amber-300">
+                      Compétition
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {schoolLeaderboard.length || 4} établissements
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Classement individuel et score cumulé par école.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5">
+              <AuthenticationPanel
+                apiBaseUrl={API_BASE_URL}
+                onAuthenticated={handleAuthenticated}
+              />
+            </div>
+          </div>
+        )}
+
+        {isSectionVisible("skills") && skillNodes.length > 0 && (
+          <div id="section-competences" className="scroll-mt-20">
+            <SkillTreeBoard
+              skills={skillNodes}
+              isAuthenticated={Boolean(currentStudent)}
+              unlockingSkillId={unlockingSkillId}
+              onUnlockSkill={handleUnlockSkill}
             />
           </div>
         )}
 
-        {(studentLeaderboard.length > 0 || schoolLeaderboard.length > 0) && (
-          <div id="section-classements" className="scroll-mt-6">
-            <LeaderboardPanel
-              studentEntries={studentLeaderboard}
-              schoolEntries={schoolLeaderboard}
-              currentUsername={currentStudent?.username}
-            />
-          </div>
-        )}
-
-        {quests.length > 0 && (
-          <div id="section-quetes" className="scroll-mt-6">
+        {isSectionVisible("quests") && quests.length > 0 && (
+          <div id="section-quetes" className="scroll-mt-20">
             <QuestLogPanel
               quests={quests}
               isAuthenticated={Boolean(currentStudent)}
@@ -661,51 +724,82 @@ export default function App() {
           </div>
         )}
 
-        {skillNodes.length > 0 && (
-          <div id="section-competences" className="scroll-mt-6">
-            <SkillTreeBoard
-              skills={skillNodes}
-              isAuthenticated={Boolean(currentStudent)}
-              unlockingSkillId={unlockingSkillId}
-              onUnlockSkill={handleUnlockSkill}
+        {isSectionVisible("integrations") && currentStudent && (
+          <div
+            id="section-integrations"
+            className="scroll-mt-20 grid grid-cols-1 gap-6 lg:grid-cols-2"
+          >
+            <GithubSyncPanel
+              initialGithubUsername={currentStudent.github_username}
+              achievements={externalAchievements}
+              isSyncing={isSyncingGithub}
+              onSyncGithub={handleSyncGithub}
+            />
+            <LinkedinSyncPanel
+              initialLinkedinUrl={currentStudent.linkedin_profile_url}
+              achievements={externalAchievements}
+              isSyncing={isSyncingLinkedin}
+              onSyncLinkedin={handleSyncLinkedin}
             />
           </div>
         )}
 
-        {progressionLadder && (
+        {isSectionVisible("integrations") && !currentStudent && (
+          <section className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-center">
+            <h3 className="text-base font-semibold text-white">
+              Synchronisation GitHub et LinkedIn
+            </h3>
+            <p className="mt-1 text-xs text-slate-400">
+              Connectez-vous à votre compte étudiant pour lier vos dépôts GitHub et importer vos certifications LinkedIn.
+            </p>
+          </section>
+        )}
+
+        {isSectionVisible("leaderboards") &&
+          (studentLeaderboard.length > 0 || schoolLeaderboard.length > 0) && (
+            <div id="section-classements" className="scroll-mt-20">
+              <LeaderboardPanel
+                studentEntries={studentLeaderboard}
+                schoolEntries={schoolLeaderboard}
+                currentUsername={currentStudent?.username}
+              />
+            </div>
+          )}
+
+        {isSectionVisible("overview") && progressionLadder && (
           <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
               <div>
                 <h3 className="text-base font-semibold text-white">
-                  Paliers d'évolution de l'Avatar ({progressionLadder.xp_per_level} XP par niveau)
+                  Paliers d'évolution de carrière
                 </h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  Calculés par le moteur Backend (/api/avatar/progression-tiers/ et /api/avatar/award-xp/)
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Chaque tranche de {progressionLadder.xp_per_level} XP fait progresser votre niveau et débloque de nouveaux titres.
                 </p>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {progressionLadder.tiers.map((tierItem) => {
                 const isCurrentTier =
                   currentStudent?.avatar.visual_tier === tierItem.visual_tier;
                 return (
                   <div
                     key={tierItem.visual_tier}
-                    className={`rounded-lg border p-4 ${
+                    className={`rounded-xl border p-4 transition-colors ${
                       isCurrentTier
-                        ? "border-emerald-400 bg-emerald-950/30"
-                        : "border-indigo-500/30 bg-slate-950"
+                        ? "border-emerald-500/60 bg-emerald-950/25"
+                        : "border-slate-800 bg-slate-950"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="rounded bg-indigo-950 px-2 py-0.5 text-xs font-semibold uppercase text-indigo-300">
+                      <span className="rounded bg-indigo-950 px-2.5 py-0.5 text-xs font-semibold uppercase text-indigo-300">
                         {tierItem.visual_tier}
                       </span>
                       <span className="text-xs text-slate-400">
                         Niveau {tierItem.min_level}+
                       </span>
                     </div>
-                    <p className="mt-3 text-sm font-semibold text-white">
+                    <p className="mt-3 text-sm font-bold text-white">
                       {tierItem.title}
                     </p>
                     <p className="mt-1 text-xs text-emerald-400">
@@ -718,6 +812,13 @@ export default function App() {
           </section>
         )}
       </main>
+
+      <footer className="mt-12 border-t border-slate-900 bg-slate-950 py-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 text-xs text-slate-500">
+          <p>CareerQuest : Plateforme de progression professionnelle et de compétences.</p>
+          <p>Arbre de compétences, Quêtes, GitHub, LinkedIn & Classements inter-écoles.</p>
+        </div>
+      </footer>
     </div>
   );
 }
