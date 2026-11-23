@@ -66,7 +66,7 @@ export default function LinkedinSyncPanel({
         </span>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <form onSubmit={handleSubmit} className="mt-4 space-y-3">
         <div>
           <label
             htmlFor="linkedin-url-input"
@@ -86,32 +86,32 @@ export default function LinkedinSyncPanel({
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="linkedin-cert-title"
-            className="block text-xs font-medium text-slate-300"
-          >
-            Certification LinkedIn à importer
-          </label>
-          <input
-            id="linkedin-cert-title"
-            data-testid="linkedin-cert-title-input"
-            type="text"
-            value={certificationTitleInput}
-            onChange={(event) => setCertificationTitleInput(event.target.value)}
-            placeholder="Kubernetes & Cloud Native DevOps"
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-          />
-        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
+          <div className="sm:col-span-5">
+            <label
+              htmlFor="linkedin-cert-title"
+              className="block text-xs font-medium text-slate-300"
+            >
+              Certification à importer
+            </label>
+            <input
+              id="linkedin-cert-title"
+              data-testid="linkedin-cert-title-input"
+              type="text"
+              value={certificationTitleInput}
+              onChange={(event) => setCertificationTitleInput(event.target.value)}
+              placeholder="Kubernetes & Cloud Native DevOps"
+              className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="linkedin-cert-issuer"
-            className="block text-xs font-medium text-slate-300"
-          >
-            Organisme émetteur
-          </label>
-          <div className="mt-1 flex gap-2">
+          <div className="sm:col-span-4">
+            <label
+              htmlFor="linkedin-cert-issuer"
+              className="block text-xs font-medium text-slate-300"
+            >
+              Organisme émetteur
+            </label>
             <input
               id="linkedin-cert-issuer"
               data-testid="linkedin-cert-issuer-input"
@@ -119,13 +119,16 @@ export default function LinkedinSyncPanel({
               value={certificationIssuerInput}
               onChange={(event) => setCertificationIssuerInput(event.target.value)}
               placeholder="Linux Foundation"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
             />
+          </div>
+
+          <div className="sm:col-span-3">
             <button
               type="submit"
               disabled={isSyncing}
               data-testid="linkedin-sync-button"
-              className="shrink-0 rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+              className="w-full rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
             >
               {isSyncing ? "Import..." : "Importer LinkedIn"}
             </button>
