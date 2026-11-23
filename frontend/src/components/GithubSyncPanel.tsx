@@ -36,17 +36,17 @@ export default function GithubSyncPanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white">
-            Intégration & Synchronisation GitHub API
+          <h3 className="text-base font-semibold text-white">
+            Compte GitHub
           </h3>
           <p className="mt-0.5 text-xs text-slate-400">
-            Analysez vos dépôts publics et langages GitHub en direct pour débloquer des accomplissements techniques.
+            Synchronisez vos dépôts publics pour valoriser vos projets techniques.
           </p>
         </div>
 
         <span
           data-testid="github-achievements-counter"
-          className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-300"
         >
           {githubAchievements.length} accomplissements GitHub (+{totalGithubXp} XP)
         </span>
